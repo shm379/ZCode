@@ -40,6 +40,9 @@ export function createDesktopPlatform(options: {
     startWebRemoteControl: (context) => window.zcode.startWebRemoteControl(context),
     stopWebRemoteControl: () => window.zcode.stopWebRemoteControl(),
     getWebRemoteControlStatus: () => window.zcode.getWebRemoteControlStatus(),
+    // 旧 preload 下方法缺失时返回 null，远控弹窗如实隐藏局域网直连区块。
+    getWebRemoteControlDirectServerInfo: () =>
+      window.zcode.getWebRemoteControlDirectServerInfo?.() ?? Promise.resolve(null),
     onWebRemoteControlStatusChanged: (handler) =>
       window.zcode.onWebRemoteControlStatusChanged?.(handler) ?? (() => {}),
     disposeRemoteSession: (sessionId) => window.zcode.disposeRemoteSession(sessionId),

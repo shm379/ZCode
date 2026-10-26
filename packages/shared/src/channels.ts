@@ -75,6 +75,7 @@ import type {
   DesktopWindowChromeState,
   WindowControlsOverlayMetrics,
   WindowControlsOverlayReadyPayload,
+  WebRemoteControlDirectServerInfo,
 } from "./platform.js";
 import type { BrowserViewportSize } from "./browser-use/command-metadata.js";
 import type {
@@ -242,6 +243,8 @@ export const PlatformChannels = {
   StopWebRemoteControl: "zcode:stop-web-remote-control",
   /** 查询当前窗口的 Web 远程控制状态 */
   GetWebRemoteControlStatus: "zcode:get-web-remote-control-status",
+  /** 查询本地直连服务器展示信息（Desktop-only；未启动返回 null） */
+  GetWebRemoteControlDirectServerInfo: "zcode:get-web-remote-control-direct-server-info",
   /** Renderer → Main：OAuth 会话变化通知，不携带凭据 */
   WebRemoteControlAuthStateChanged: "zcode:web-remote-control-auth-state-changed",
   /** Main → Renderer：当前窗口 Web 远程控制状态变化 */
@@ -868,6 +871,10 @@ export interface PlatformChannelMap {
   [PlatformChannels.GetWebRemoteControlStatus]: {
     request: void;
     response: WebRemoteControlStatus;
+  };
+  [PlatformChannels.GetWebRemoteControlDirectServerInfo]: {
+    request: void;
+    response: WebRemoteControlDirectServerInfo | null;
   };
   [PlatformChannels.WebRemoteControlStatusChanged]: {
     request: WebRemoteControlStatus;

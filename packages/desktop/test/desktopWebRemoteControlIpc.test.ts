@@ -71,6 +71,7 @@ describe("Web Remote Control IPC telemetry", () => {
     const manager = withStartAuthorization({ start: vi.fn(), stop: vi.fn(), getStatus: vi.fn() });
     registerWebRemoteControlIpcHandlers({
       reportRemoteUsageEvent: vi.fn(),
+      getDirectServerInfo: vi.fn(() => null),
       webRemoteControlManager: manager,
     });
     const notify = h.listeners.get(PlatformChannels.WebRemoteControlAuthStateChanged)!;
@@ -97,6 +98,7 @@ describe("Web Remote Control IPC telemetry", () => {
       await import("../src/main/desktopWebRemoteControlIpc.js");
     registerWebRemoteControlIpcHandlers({
       reportRemoteUsageEvent,
+      getDirectServerInfo: vi.fn(() => null),
       webRemoteControlManager: withStartAuthorization({
         start,
         stop: vi.fn(),
@@ -126,24 +128,45 @@ describe("Web Remote Control IPC telemetry", () => {
     expect(h.showMessageBox).not.toHaveBeenCalled();
   });
 
-  it("只注册start/stop/status，不再暴露刷新配对IPC", async () => {
+  it("只注册start/stop/status/direct-server-info，不再暴露刷新配对IPC", async () => {
     const { registerWebRemoteControlIpcHandlers } =
       await import("../src/main/desktopWebRemoteControlIpc.js");
+    const getDirectServerInfo = vi.fn(() => ({
+      url: "http://10.0.0.2:3030/?token=tok",
+      port: 3030,
+      lanIps: ["10.0.0.2"],
+      staticRootConfigured: false,
+    }));
     registerWebRemoteControlIpcHandlers({
       reportRemoteUsageEvent: vi.fn(),
+      getDirectServerInfo,
       webRemoteControlManager: withStartAuthorization({
         start: vi.fn(),
         stop: vi.fn(),
         getStatus: vi.fn(),
       }),
     });
+    // direct-server 通道是直连特性的一部分（docs/direct-server-desktop.md），
+    // 与旧断言「只注册三个通道」不同：登记 4 个通道且不暴露刷新配对 IPC。
     expect([...h.handlers.keys()].sort()).toEqual(
       [
         PlatformChannels.StartWebRemoteControl,
         PlatformChannels.StopWebRemoteControl,
         PlatformChannels.GetWebRemoteControlStatus,
+        PlatformChannels.GetWebRemoteControlDirectServerInfo,
       ].sort(),
     );
+    // ipcMain.handle 注册的处理器同步返回展示信息，不经过 Promise。
+    expect(
+      h.handlers.get(PlatformChannels.GetWebRemoteControlDirectServerInfo)?.({
+        sender: { id: 73 },
+      }),
+    ).toEqual({
+      url: "http://10.0.0.2:3030/?token=tok",
+      port: 3030,
+      lanIps: ["10.0.0.2"],
+      staticRootConfigured: false,
+    });
   });
 
   it("启动失败时只上报低基数错误分类并保留原错误", async () => {
@@ -155,6 +178,7 @@ describe("Web Remote Control IPC telemetry", () => {
       await import("../src/main/desktopWebRemoteControlIpc.js");
     registerWebRemoteControlIpcHandlers({
       reportRemoteUsageEvent,
+      getDirectServerInfo: vi.fn(() => null),
       webRemoteControlManager: withStartAuthorization({
         start: vi.fn(async () => {
           throw error;
@@ -191,6 +215,7 @@ describe("Web Remote Control IPC telemetry", () => {
       reportRemoteUsageEvent: vi.fn(() => {
         throw loggerFailure;
       }),
+      getDirectServerInfo: vi.fn(() => null),
       webRemoteControlManager: withStartAuthorization({
         start: vi.fn(async () => ({ status: "running" })),
         stop: vi.fn(),
@@ -219,6 +244,7 @@ describe("Web Remote Control IPC telemetry", () => {
       await import("../src/main/desktopWebRemoteControlIpc.js");
     registerWebRemoteControlIpcHandlers({
       reportRemoteUsageEvent: vi.fn(),
+      getDirectServerInfo: vi.fn(() => null),
       webRemoteControlManager: {
         startAuthorized,
         authorizeStart,

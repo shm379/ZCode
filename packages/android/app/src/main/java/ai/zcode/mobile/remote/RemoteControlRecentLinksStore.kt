@@ -1,4 +1,4 @@
-package com.example.zcode_mobile.remote
+package ai.zcode.mobile.remote
 
 import android.content.Context
 import android.net.Uri
@@ -20,12 +20,14 @@ object RemoteControlRecentLinksStore {
     fun read(context: Context): List<RemoteControlRecentLink> {
         val raw = prefs(context).getString(KEY_LINKS, null) ?: return emptyList()
         val array = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+        // 直连服务器链接的合法性依赖当前已保存 origin，校验时一并传入，避免旧条目被误丢。
+        val directOrigins = DirectServerStore.savedOrigins(context)
         return buildList {
             for (index in 0 until array.length()) {
                 val item = array.optJSONObject(index) ?: continue
                 val url = item.optString("url").takeIf { it.isNotBlank() } ?: continue
                 val openedAt = item.optLong("openedAt", 0L).takeIf { it > 0L } ?: continue
-                if (RemoteControlUrlPolicy.resolve(url) != null) {
+                if (RemoteControlUrlPolicy.resolve(url, directOrigins) != null) {
                     add(RemoteControlRecentLink(url = url, openedAt = openedAt))
                 }
             }
@@ -33,7 +35,8 @@ object RemoteControlRecentLinksStore {
     }
 
     fun record(context: Context, url: String): List<RemoteControlRecentLink> {
-        val resolvedUrl = RemoteControlUrlPolicy.resolve(url) ?: return read(context)
+        val resolvedUrl = RemoteControlUrlPolicy.resolve(url, DirectServerStore.savedOrigins(context))
+            ?: return read(context)
         val updated = listOf(RemoteControlRecentLink(resolvedUrl, System.currentTimeMillis()))
             .plus(read(context).filterNot { it.url == resolvedUrl })
             .take(MAX_LINKS)

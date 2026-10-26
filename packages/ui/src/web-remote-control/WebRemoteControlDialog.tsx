@@ -10,14 +10,20 @@ import {
 } from "@/web-remote-control/domain/presentation.js";
 import { memo, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
-import type { BotProvider, WebRemoteControlStatus } from "@zcode/shared";
+import type {
+  BotProvider,
+  WebRemoteControlDirectServerInfo,
+  WebRemoteControlStatus,
+} from "@zcode/shared";
 import {
   Bot as BotIcon,
   CopyIcon,
   LoaderCircle,
   MonitorSmartphone,
   Smartphone,
+  TriangleAlert,
   Unplug,
+  Wifi,
   XIcon,
 } from "lucide-react";
 import { BotsDialog } from "@/BotsDialog.js";
@@ -99,6 +105,8 @@ export const WebRemoteControlDialog = memo(function WebRemoteControlDialogCompon
   });
   const [loading, setLoading] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [directInfo, setDirectInfo] = useState<WebRemoteControlDirectServerInfo | null>(null);
+  const [directQrDataUrl, setDirectQrDataUrl] = useState<string | null>(null);
   const [botsDialogOpen, setBotsDialogOpen] = useState(false);
   const [botEntryProvider, setBotEntryProvider] = useState<RemoteControlBotProvider | null>(null);
 
@@ -255,6 +263,63 @@ export const WebRemoteControlDialog = memo(function WebRemoteControlDialogCompon
   }, [open, platform, remoteSessionId, workspaceIdentity, workspacePath]);
 
   useEffect(() => {
+    if (!open) {
+      setDirectInfo(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDirectServerInfo = async () => {
+      try {
+        // 平台不支持（Web / 旧 preload）或服务器未启动时为 null，直连区块整体隐藏。
+        const info = (await platform.getWebRemoteControlDirectServerInfo?.()) ?? null;
+        if (!cancelled) {
+          setDirectInfo(info);
+        }
+      } catch {
+        if (!cancelled) {
+          setDirectInfo(null);
+        }
+      }
+    };
+
+    void loadDirectServerInfo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, platform]);
+
+  useEffect(() => {
+    if (!directInfo?.url) {
+      setDirectQrDataUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    setDirectQrDataUrl(null);
+
+    void QRCode.toDataURL(directInfo.url, {
+      margin: 1,
+      width: 320,
+    })
+      .then((dataUrl: string) => {
+        if (!cancelled) {
+          setDirectQrDataUrl(dataUrl);
+        }
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error("[WebRemoteControlDialog] 生成直连二维码失败", message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [directInfo?.url]);
+
+  useEffect(() => {
     if (!status.qrUrl) {
       setQrDataUrl(null);
       return;
@@ -299,6 +364,24 @@ export const WebRemoteControlDialog = memo(function WebRemoteControlDialogCompon
       const message = error instanceof Error ? error.message : String(error);
       toast(intl.formatMessage({ id: "webRemoteControl.copyLinkFailed" }, { error: message }));
       logger.error("[WebRemoteControlDialog] 复制 Web 远程控制链接失败", message);
+    }
+  };
+
+  const handleCopyDirectUrl = async () => {
+    if (!directInfo?.url) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(directInfo.url);
+      toast(intl.formatMessage({ id: "webRemoteControl.direct.copied" }));
+      logger.info("[WebRemoteControlDialog] 已复制局域网直连链接", {
+        port: directInfo.port,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast(intl.formatMessage({ id: "webRemoteControl.direct.copyFailed" }, { error: message }));
+      logger.error("[WebRemoteControlDialog] 复制局域网直连链接失败", message);
     }
   };
 
@@ -612,6 +695,90 @@ export const WebRemoteControlDialog = memo(function WebRemoteControlDialogCompon
                 </div>
               </section>
             </div>
+
+            {directInfo ? (
+              <section
+                data-testid="web-remote-control-direct-card"
+                className="mt-4 rounded-xl border border-border bg-card p-4"
+              >
+                <div className="mb-4 flex items-start gap-2">
+                  <Wifi className="mt-0.5 size-4 shrink-0 text-foreground-subtle" />
+                  <div className="min-w-0 space-y-1">
+                    <div className="text-ui-base font-medium text-foreground">
+                      {intl.formatMessage({ id: "webRemoteControl.direct.title" })}
+                    </div>
+                    <p className="text-ui-base/relaxed text-foreground-subtle">
+                      {intl.formatMessage({ id: "webRemoteControl.direct.description" })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="space-y-1">
+                      <div className="text-ui-caption font-medium text-foreground-subtle">
+                        {intl.formatMessage({ id: "webRemoteControl.direct.urlLabel" })}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-3 py-2 text-ui-sm text-foreground">
+                          {directInfo.url}
+                        </code>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="default"
+                          className="shrink-0 gap-2 enabled:cursor-pointer"
+                          onClick={() => void handleCopyDirectUrl()}
+                        >
+                          <CopyIcon className="size-3.5" />
+                          {intl.formatMessage({ id: "webRemoteControl.direct.copy" })}
+                        </Button>
+                      </div>
+                      <p className="text-ui-xs/relaxed text-foreground-subtle">
+                        {intl.formatMessage({ id: "webRemoteControl.direct.tokenNote" })}
+                      </p>
+                    </div>
+                    {directInfo.lanIps.length > 1 ? (
+                      <div className="space-y-1">
+                        <div className="text-ui-caption font-medium text-foreground-subtle">
+                          {intl.formatMessage({ id: "webRemoteControl.direct.otherAddresses" })}
+                        </div>
+                        <ul className="space-y-0.5">
+                          {directInfo.lanIps.slice(1).map((ip) => (
+                            <li
+                              key={ip}
+                              className="truncate text-ui-sm/relaxed text-foreground-subtle"
+                            >
+                              {`http://${ip}:${directInfo.port}/?token=…`}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {!directInfo.staticRootConfigured ? (
+                      <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-ui-sm/relaxed text-foreground-subtle">
+                        <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                        <p>
+                          {intl.formatMessage({
+                            id: "webRemoteControl.direct.staticRootMissing",
+                          })}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center justify-center rounded-xl border border-dashed border-border bg-background-alt p-3 md:w-52">
+                    {directQrDataUrl ? (
+                      <img
+                        src={directQrDataUrl}
+                        alt={intl.formatMessage({ id: "webRemoteControl.direct.qrAlt" })}
+                        className="size-40 max-w-full rounded-lg bg-white p-2"
+                      />
+                    ) : (
+                      <LoaderCircle className="size-5 animate-spin text-foreground-subtle" />
+                    )}
+                  </div>
+                </div>
+              </section>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>

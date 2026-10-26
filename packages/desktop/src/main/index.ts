@@ -166,6 +166,11 @@ import {
 } from "./desktopWindowLifecycle.js";
 import { resolveZCodeBuiltinProviderConfigFilePath } from "./desktopProviderConfig.js";
 import {
+  disposeDesktopDirectServer,
+  getDesktopDirectServerInfo,
+  startDesktopDirectServer,
+} from "./direct-server/index.js";
+import {
   getCredentialsDir,
   isDockerDaemonAvailable,
   listSSHConfigAliases,
@@ -1236,6 +1241,15 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
     // remote session、attachment 和 transport 都由窗口 Host 持有；这里先清理
     // Main 的请求关联，再由下方每窗口唯一 Host 的 shutdown barrier 释放真实连接与 Agent。
     remoteSessionManager.disposeAllAndWaitForAppShutdown(reason),
+    // 本地直连服务器与 Host 清理无依赖，进入同一并行屏障；sqlite 句柄与监听端口必须
+    // 在进程退出前收口（spec：docs/direct-server-desktop.md）。
+    (async () => {
+      try {
+        await disposeDesktopDirectServer();
+      } catch (error) {
+        logger.warn("[app-quit] direct server dispose failed:", error);
+      }
+    })(),
     ...hostProcesses.map((child, index) =>
       disposeHostProcessAndWait(
         child,
@@ -2141,6 +2155,10 @@ app.whenReady().then(async () => {
     } catch (error) {
       logger.error("[cron-scheduler] failed to spawn scheduler process:", error);
     }
+    // 本地直连服务器（spec：docs/direct-server-desktop.md）与 scheduler 同一 ready 门：
+    // 等 Host 完成 tasks-index 统一迁移后再开自己的 services 图，避免两个写者抢首迁移。
+    // 启动失败不阻断桌面；远控弹窗读不到信息时如实隐藏直连区块。
+    void startDesktopDirectServer();
   });
 
   if (process.platform === "win32") {
@@ -2425,6 +2443,7 @@ app.whenReady().then(async () => {
     },
     finalArmsCustomEventE2EEnabled: shouldEnableE2ETestBridge(process.env),
     webRemoteControlManager,
+    getDirectServerInfo: getDesktopDirectServerInfo,
     createRemoteWorkspaceSession: remoteSessionManager.createRemoteWorkspaceSession,
     getRemoteConnectionStats: remoteSessionManager.getRemoteConnectionStats,
     disposeRemoteWorkspaceSession: remoteSessionManager.disposeRemoteWorkspaceSession,

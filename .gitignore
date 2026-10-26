@@ -75,3 +75,6 @@ packages/desktop/resources/macos-window-bounds/
 __pycache__/
 *.pyc
 .zcode-runtime
+.v2c/
+.video_agent/
+.zcode/

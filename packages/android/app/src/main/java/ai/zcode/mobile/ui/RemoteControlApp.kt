@@ -1,4 +1,4 @@
-package com.example.zcode_mobile.ui
+package ai.zcode.mobile.ui
 
 import android.annotation.SuppressLint
 import android.Manifest
@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,18 +62,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.example.zcode_mobile.BuildConfig
-import com.example.zcode_mobile.R
-import com.example.zcode_mobile.remote.RemoteControlRecentLink
-import com.example.zcode_mobile.remote.RemoteControlUrlPolicy
-import com.example.zcode_mobile.remote.displaySubtitle
-import com.example.zcode_mobile.remote.displayTitle
+import ai.zcode.mobile.BuildConfig
+import ai.zcode.mobile.R
+import ai.zcode.mobile.remote.DirectServer
+import ai.zcode.mobile.remote.DirectServerDraft
+import ai.zcode.mobile.remote.DirectServerSaveResult
+import ai.zcode.mobile.remote.DirectServerStore
+import ai.zcode.mobile.remote.RemoteControlRecentLink
+import ai.zcode.mobile.remote.RemoteControlUrlPolicy
+import ai.zcode.mobile.remote.displaySubtitle
+import ai.zcode.mobile.remote.displayTitle
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -86,14 +92,20 @@ import java.util.concurrent.atomic.AtomicBoolean
 fun RemoteControlApp(
     remoteUrl: String?,
     recentLinks: List<RemoteControlRecentLink>,
+    directServers: List<DirectServer>,
     modifier: Modifier = Modifier,
     onOpenUrl: (String) -> Boolean,
     onCloseRemote: () -> Unit,
     onClearRecentLinks: () -> Unit,
+    onAddDirectServer: (address: String, token: String?) -> DirectServerSaveResult,
+    onConnectDirectServer: (id: String) -> Boolean,
+    onDeleteDirectServer: (id: String) -> Unit,
 ) {
     val context = LocalContext.current
     var scannerOpen by rememberSaveable { mutableStateOf(false) }
     var launcherError by rememberSaveable { mutableStateOf<String?>(null) }
+    // 扫码直连草稿：不需要跨进程恢复，用户重扫一次即可，普通 remember 即可。
+    var pendingDirectDraft by remember { mutableStateOf<DirectServerDraft?>(null) }
     val cameraPermissionDenied = stringResource(R.string.remote_scan_permission_denied)
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -117,19 +129,32 @@ fun RemoteControlApp(
                     scannerOpen = false
                 },
                 onScanned = { raw ->
+                    // 第一优先级保持原行为：relay / 深链 / 已保存直连 origin 直接打开。
                     val opened = onOpenUrl(raw)
+                    var accepted = opened
                     if (opened) {
                         scannerOpen = false
                         launcherError = null
                     } else {
-                        launcherError = context.getString(R.string.remote_scan_invalid)
+                        // 白名单拒绝后再尝试按直连服务器地址解析；成功则先确认再保存+连接，
+                        // 失败维持原有的「二维码无效」提示，壳仍不退化为任意浏览器。
+                        val draft = DirectServerDraft.fromUrl(raw)
+                        if (draft == null) {
+                            launcherError = context.getString(R.string.remote_scan_invalid)
+                        } else {
+                            accepted = true
+                            scannerOpen = false
+                            launcherError = null
+                            pendingDirectDraft = draft
+                        }
                     }
-                    opened
+                    accepted
                 },
             )
         } else if (remoteUrl == null) {
             RemoteControlLauncher(
                 recentLinks = recentLinks,
+                directServers = directServers,
                 errorMessage = launcherError,
                 onOpenUrl = { raw ->
                     val opened = onOpenUrl(raw)
@@ -152,6 +177,9 @@ fun RemoteControlApp(
                     }
                 },
                 onClearRecentLinks = onClearRecentLinks,
+                onAddDirectServer = onAddDirectServer,
+                onConnectDirectServer = onConnectDirectServer,
+                onDeleteDirectServer = onDeleteDirectServer,
             )
         } else {
             RemoteControlWebViewScreen(
@@ -159,7 +187,54 @@ fun RemoteControlApp(
                 onCloseRemote = onCloseRemote,
             )
         }
+        pendingDirectDraft?.let { draft ->
+            DirectServerDraftConfirmDialog(
+                draft = draft,
+                onConfirm = {
+                    pendingDirectDraft = null
+                    // DUPLICATE 理论上不可达（已保存 origin 会先被白名单 resolve 放行），
+                    // 这里兜底改为连接已存在条目而不是报错；连接仍走 onConnectDirectServer
+                    // 的白名单校验，与启动页「直连服务器」区块是同一条路径。
+                    val target = when (val result = onAddDirectServer(draft.address, draft.token)) {
+                        is DirectServerSaveResult.Success ->
+                            result.servers.lastOrNull { it.origin == draft.address }
+                        is DirectServerSaveResult.Invalid ->
+                            directServers.firstOrNull { it.origin == draft.address }
+                    }
+                    if (target == null || !onConnectDirectServer(target.id)) {
+                        launcherError = context.getString(R.string.remote_direct_connect_failed)
+                    }
+                },
+                onDismiss = {
+                    pendingDirectDraft = null
+                },
+            )
+        }
     }
+}
+
+@Composable
+private fun DirectServerDraftConfirmDialog(
+    draft: DirectServerDraft,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        text = {
+            Text(stringResource(R.string.remote_scan_direct_confirm_message, draft.label))
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.remote_scan_direct_confirm_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.remote_scan_direct_cancel))
+            }
+        },
+    )
 }
 
 @Composable
@@ -393,10 +468,14 @@ private fun analyzeRemoteQrImage(
 @Composable
 private fun RemoteControlLauncher(
     recentLinks: List<RemoteControlRecentLink>,
+    directServers: List<DirectServer>,
     errorMessage: String?,
     onOpenUrl: (String) -> Boolean,
     onScanQrCode: () -> Unit,
     onClearRecentLinks: () -> Unit,
+    onAddDirectServer: (address: String, token: String?) -> DirectServerSaveResult,
+    onConnectDirectServer: (id: String) -> Boolean,
+    onDeleteDirectServer: (id: String) -> Unit,
 ) {
     val context = LocalContext.current
     var input by rememberSaveable { mutableStateOf("") }
@@ -462,6 +541,12 @@ private fun RemoteControlLauncher(
         ) {
             Text(stringResource(R.string.remote_scan_button))
         }
+        RemoteControlDirectServerSection(
+            servers = directServers,
+            onAdd = onAddDirectServer,
+            onConnect = onConnectDirectServer,
+            onDelete = onDeleteDirectServer,
+        )
         if (recentLinks.isNotEmpty()) {
             Spacer(modifier = Modifier.height(20.dp))
             Row(
@@ -515,12 +600,133 @@ private fun RemoteControlLauncher(
 }
 
 @Composable
+private fun RemoteControlDirectServerSection(
+    servers: List<DirectServer>,
+    onAdd: (address: String, token: String?) -> DirectServerSaveResult,
+    onConnect: (id: String) -> Boolean,
+    onDelete: (id: String) -> Unit,
+) {
+    var address by rememberSaveable { mutableStateOf("") }
+    var token by rememberSaveable { mutableStateOf("") }
+    var formError by rememberSaveable { mutableStateOf<String?>(null) }
+    val badUrlMessage = stringResource(R.string.remote_direct_bad_url)
+    val duplicateMessage = stringResource(R.string.remote_direct_duplicate)
+    val tokenSavedLabel = stringResource(R.string.remote_direct_has_token)
+
+    Spacer(modifier = Modifier.height(24.dp))
+    Text(
+        text = stringResource(R.string.remote_direct_title),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onBackground,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = stringResource(R.string.remote_direct_description),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    OutlinedTextField(
+        value = address,
+        onValueChange = {
+            address = it
+            formError = null
+        },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        label = { Text(stringResource(R.string.remote_direct_address_label)) },
+        placeholder = { Text(stringResource(R.string.remote_direct_address_placeholder)) },
+        isError = formError != null,
+        supportingText = {
+            formError?.let { Text(it) }
+        },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    OutlinedTextField(
+        value = token,
+        onValueChange = {
+            token = it
+            formError = null
+        },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        label = { Text(stringResource(R.string.remote_direct_token_label)) },
+        visualTransformation = PasswordVisualTransformation(),
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    OutlinedButton(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = {
+            when (val result = onAdd(address, token)) {
+                is DirectServerSaveResult.Success -> {
+                    address = ""
+                    token = ""
+                    formError = null
+                }
+                is DirectServerSaveResult.Invalid -> {
+                    formError = when (result.reason) {
+                        DirectServerSaveResult.Reason.BAD_URL -> badUrlMessage
+                        DirectServerSaveResult.Reason.DUPLICATE -> duplicateMessage
+                    }
+                }
+            }
+        },
+    ) {
+        Text(stringResource(R.string.remote_direct_add_button))
+    }
+    if (servers.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(12.dp))
+        servers.forEach { server ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = { onConnect(server.id) },
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f, fill = false),
+                        horizontalAlignment = Alignment.Start,
+                    ) {
+                        Text(
+                            text = server.label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = if (server.token != null) {
+                                "${server.origin} · $tokenSavedLabel"
+                            } else {
+                                server.origin
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                TextButton(onClick = { onDelete(server.id) }) {
+                    Text(stringResource(R.string.remote_direct_delete_button))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun RemoteControlWebViewScreen(
     remoteUrl: String,
     onCloseRemote: () -> Unit,
 ) {
     val context = LocalContext.current
     var webView by remember { mutableStateOf<WebView?>(null) }
+    // 服务器条目只会在启动页增删；WebView 存续期间白名单不会变，进屏时读取一次即可。
+    val directServerOrigins = remember { DirectServerStore.savedOrigins(context) }
     var progress by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
     var pageError by remember { mutableStateOf<String?>(null) }
@@ -563,6 +769,7 @@ private fun RemoteControlWebViewScreen(
                 factory = {
                     createRemoteControlWebView(
                         context = context,
+                        directServerOrigins = directServerOrigins,
                         onLoadingChanged = { loading ->
                             isLoading = loading
                         },
@@ -681,6 +888,7 @@ private fun RemoteControlErrorOverlay(
 @SuppressLint("SetJavaScriptEnabled")
 private fun createRemoteControlWebView(
     context: android.content.Context,
+    directServerOrigins: Set<String>,
     onLoadingChanged: (Boolean) -> Unit,
     onProgressChanged: (Int) -> Unit,
     onMainFrameError: (String) -> Unit,
@@ -728,7 +936,7 @@ private fun createRemoteControlWebView(
                     return false
                 }
 
-                val resolved = RemoteControlUrlPolicy.resolve(request.url)
+                val resolved = RemoteControlUrlPolicy.resolve(request.url, directServerOrigins)
                 if (resolved != null) {
                     if (request.url.scheme == "zcode") {
                         view.loadUrl(resolved)

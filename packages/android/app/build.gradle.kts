@@ -1,10 +1,44 @@
+import java.io.File
+import java.util.Properties
+
+private data class ReleaseSigningConfig(
+    val storeFile: File,
+    val storePassword: String,
+    val keyAlias: String,
+    val keyPassword: String,
+)
+
+// 优先读 packages/android/keystore.properties，其次 ~/.gradle/zcode-android-release.properties；
+// 都不存在或字段不全时返回 null，release 退化为未签名产物而不是构建失败。
+// keystore 与含口令的 properties 不得提交（见 .gitignore 与 docs/mobile-remote-control-android.md）。
+private fun loadReleaseSigningConfig(): ReleaseSigningConfig? {
+    val candidates = listOf(
+        rootProject.file("keystore.properties"),
+        File(System.getProperty("user.home"), ".gradle/zcode-android-release.properties"),
+    )
+    val props = candidates.firstOrNull { it.isFile }?.let { file ->
+        Properties().apply { file.inputStream().use { load(it) } }
+    } ?: return null
+
+    val storePath = props.getProperty("ZCODE_ANDROID_STORE_FILE") ?: return null
+    val storeFile = if (File(storePath).isAbsolute) File(storePath) else rootProject.file(storePath)
+    val storePassword = props.getProperty("ZCODE_ANDROID_STORE_PASSWORD") ?: return null
+    val keyAlias = props.getProperty("ZCODE_ANDROID_KEY_ALIAS") ?: return null
+    val keyPassword = props.getProperty("ZCODE_ANDROID_KEY_PASSWORD") ?: return null
+    if (!storeFile.isFile) {
+        logger.warn("ZCODE_ANDROID_STORE_FILE 指向的文件不存在: ${storeFile.path}；release 将不签名。")
+        return null
+    }
+    return ReleaseSigningConfig(storeFile, storePassword, keyAlias, keyPassword)
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
-    namespace = "com.example.zcode_mobile"
+    namespace = "ai.zcode.mobile"
     buildToolsVersion = "36.1.0"
     compileSdk {
         version = release(36) {
@@ -13,15 +47,28 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.zcode_mobile"
+        applicationId = "ai.zcode.mobile"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         buildConfigField("String", "REMOTE_CONTROL_DEFAULT_URL", "\"https://zcode.z.ai/remote\"")
+    }
+
+    val releaseSigning = loadReleaseSigningConfig()
+
+    signingConfigs {
+        releaseSigning?.let { signing ->
+            create("release") {
+                storeFile = signing.storeFile
+                storePassword = signing.storePassword
+                keyAlias = signing.keyAlias
+                keyPassword = signing.keyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -30,6 +77,9 @@ android {
             buildConfigField("String", "REMOTE_CONTROL_DEFAULT_URL", "\"https://zcode.z.ai/remote\"")
         }
         release {
+            // 直连自托管 zcode-server 放开 http（局域网）；导航安全边界在 RemoteControlUrlPolicy。
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+            releaseSigning?.let { signingConfig = signingConfigs.getByName("release") }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

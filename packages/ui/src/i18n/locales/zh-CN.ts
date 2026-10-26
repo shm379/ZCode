@@ -2338,6 +2338,18 @@ const zhCN: Record<string, string> = {
   "webRemoteControl.botChannel.telegram.description": "从 Telegram 打开这个工作区。",
   "webRemoteControl.botChannel.configure": "去 Bot Channels 配置",
   "webRemoteControl.botChannel.manageBots": "机器人管理",
+  "webRemoteControl.direct.title": "局域网直连",
+  "webRemoteControl.direct.description":
+    "手机与电脑在同一 Wi-Fi 下，用 Android 客户端扫码即可连接，无需中继和账号登录。",
+  "webRemoteControl.direct.urlLabel": "直连服务器地址",
+  "webRemoteControl.direct.copy": "复制链接",
+  "webRemoteControl.direct.copied": "直连链接已复制",
+  "webRemoteControl.direct.copyFailed": "复制直连链接失败：{error}",
+  "webRemoteControl.direct.qrAlt": "局域网直连二维码",
+  "webRemoteControl.direct.tokenNote": "该链接包含访问令牌，请只分享给你信任的设备。",
+  "webRemoteControl.direct.otherAddresses": "本机其他网卡地址：",
+  "webRemoteControl.direct.staticRootMissing":
+    "本机未配置 Web 页面资源（ZCODE_WEB_STATIC_ROOT）：手机可以建立连接，但网页界面不会加载。",
   "webRemoteControl.linkLabel": "远程控制链接",
   "webRemoteControl.linkPending": "远程控制链接就绪后会显示在这里。",
   "webRemoteControl.singlePageNote":

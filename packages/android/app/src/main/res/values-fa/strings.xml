@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZCode</string>
+    <string name="remote_launcher_title">کنترل از راه دور ZCode</string>
+    <string name="remote_launcher_description">لینک کنترل از راه دور را از QR دسکتاپ باز کنید.</string>
+    <string name="remote_url_label">لینک ریموت</string>
+    <string name="remote_url_placeholder">https://zcode.z.ai/remote?sid=...</string>
+    <string name="remote_url_invalid">لینک ریموت ZCode وارد کنید.</string>
+    <string name="remote_open_button">باز کردن کنترل از راه دور</string>
+    <string name="remote_scan_button">اسکن کد QR</string>
+    <string name="remote_scan_title">اسکن QR دسکتاپ</string>
+    <string name="remote_scan_hint">دوربین را روی کد QR کنترل از راه دور ZCode بگیرید.</string>
+    <string name="remote_scan_invalid">این کد QR لینک ریموت ZCode نیست.</string>
+    <string name="remote_scan_permission_denied">برای اسکن کد QR دسترسی دوربین لازم است.</string>
+    <string name="remote_scan_camera_failed">راه‌اندازی دوربین ممکن نشد.</string>
+    <string name="remote_direct_title">اتصال مستقیم</string>
+    <string name="remote_direct_description">به zcode-server خودت در شبکه وصل شو (host یا host:port).</string>
+    <string name="remote_direct_address_label">آدرس سرور</string>
+    <string name="remote_direct_address_placeholder">192.168.1.10:3030</string>
+    <string name="remote_direct_token_label">توکن دسترسی (اختیاری)</string>
+    <string name="remote_direct_add_button">ذخیرهٔ سرور</string>
+    <string name="remote_direct_delete_button">حذف</string>
+    <string name="remote_direct_bad_url">آدرس سرور معتبری وارد کنید (مثل 192.168.1.10:3030 یا https://host).</string>
+    <string name="remote_direct_duplicate">این سرور قبلاً ذخیره شده است.</string>
+    <string name="remote_direct_has_token">توکن ذخیره شده</string>
+    <string name="remote_scan_direct_confirm_message">ذخیره و اتصال به %1$s؟</string>
+    <string name="remote_scan_direct_confirm_save">ذخیره و اتصال</string>
+    <string name="remote_scan_direct_cancel">لغو</string>
+    <string name="remote_direct_connect_failed">اتصال به سرور ذخیره‌شده ممکن نشد.</string>
+    <string name="remote_recent_title">لینک‌های اخیر</string>
+    <string name="remote_recent_clear">پاک کردن</string>
+    <string name="remote_screen_title">کنترل از راه دور</string>
+    <string name="remote_reload_button">بارگذاری مجدد</string>
+    <string name="remote_close_button">بستن</string>
+    <string name="remote_retry_button">تلاش مجدد</string>
+    <string name="remote_load_failed_title">کنترل از راه دور بارگذاری نشد</string>
+    <string name="remote_keep_alive_title">کنترل از راه دور ZCode فعال است</string>
+    <string name="remote_keep_alive_text">در حین استفاده از گوشی، نشست ریموت آماده نگه داشته می‌شود.</string>
+    <string name="remote_keep_alive_channel">کنترل از راه دور</string>
+    <string name="remote_keep_alive_channel_description">وضعیت اتصال نشست‌های ریموت ZCode.</string>
+</resources>

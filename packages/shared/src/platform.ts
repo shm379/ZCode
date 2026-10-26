@@ -624,6 +624,21 @@ export type BindRemoteWorkspaceSessionContextIpcResult =
       retryable?: boolean;
     };
 
+/**
+ * 本地直连服务器（局域网直连 + QR）的一次性展示信息；见 docs/direct-server-desktop.md。
+ * 只承载展示所需字段，token 以完整 URL 形式出现，消费方不得写日志或持久化。
+ */
+export interface WebRemoteControlDirectServerInfo {
+  /** 首选候选地址的完整连接 URL：http://<lan-ip>:<port>/?token=<token> */
+  url: string;
+  /** 服务器实际监听端口（偏好端口被占时会回落到系统分配端口） */
+  port: number;
+  /** 局域网候选 IPv4（按 os.networkInterfaces 顺序），首选候选在前 */
+  lanIps: string[];
+  /** 服务器是否配置了 Web SPA 静态根（ZCODE_WEB_STATIC_ROOT）；未配置时 / 返回 404 */
+  staticRootConfigured: boolean;
+}
+
 export const DesktopCommandIds = {
   NewTask: "newTask",
   OpenWorkspace: "openWorkspace",
@@ -796,6 +811,13 @@ export interface IPlatformService {
 
   /** 查询当前窗口 Web 远程控制状态 */
   getWebRemoteControlStatus(): Promise<WebRemoteControlStatus>;
+
+  /**
+   * Desktop-only：查询本地直连服务器（局域网直连 + QR，见 docs/direct-server-desktop.md）
+   * 的展示信息。未启动或平台不支持时返回 null / 方法缺失，UI 隐藏直连区块。
+   * token 只经此一次性 IPC 提供，不落 renderer 持久化、不进日志。
+   */
+  getWebRemoteControlDirectServerInfo?(): Promise<WebRemoteControlDirectServerInfo | null>;
 
   /** 桌面 OAuth 会话通知；main 独立重读凭据后决定是否恢复远控。 */
   notifyWebRemoteControlAuthStateChanged?(change: WebRemoteControlAuthStateChange): void;

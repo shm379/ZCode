@@ -1,3 +1,13 @@
+<!-- FORK:BEGIN -->
+> **ZCode fork** — This is an extended build of ZCode. On top of the upstream code it includes:
+>
+> - an Android remote-control app ([packages/android](packages/android/)) to control the desktop from a phone
+> - direct connection to a self-hosted zcode-server, no cloud relay required
+> - an Android release line tagged `mobile-v*` with published APKs
+>
+> Full fork guide and upstream sync instructions: [FORK.md](FORK.md)
+<!-- FORK:END -->
+
 # ZCode
 
 <div align="center">

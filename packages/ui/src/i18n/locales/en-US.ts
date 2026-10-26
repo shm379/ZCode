@@ -2513,6 +2513,19 @@ const enUS: Record<string, string> = {
   "webRemoteControl.botChannel.telegram.description": "Open this workspace from Telegram.",
   "webRemoteControl.botChannel.configure": "Configure in bot channels",
   "webRemoteControl.botChannel.manageBots": "Manage bots",
+  "webRemoteControl.direct.title": "Direct connection (LAN)",
+  "webRemoteControl.direct.description":
+    "Scan with the Android app while on the same Wi-Fi. No relay or account needed.",
+  "webRemoteControl.direct.urlLabel": "Direct server URL",
+  "webRemoteControl.direct.copy": "Copy link",
+  "webRemoteControl.direct.copied": "Direct connection link copied",
+  "webRemoteControl.direct.copyFailed": "Could not copy direct connection link: {error}",
+  "webRemoteControl.direct.qrAlt": "Direct connection QR code",
+  "webRemoteControl.direct.tokenNote":
+    "This link contains an access token. Only share it with devices you trust.",
+  "webRemoteControl.direct.otherAddresses": "Other addresses on this machine:",
+  "webRemoteControl.direct.staticRootMissing":
+    "Web page assets are not configured on this machine (ZCODE_WEB_STATIC_ROOT). Phones can connect, but the web UI will not load.",
   "webRemoteControl.linkLabel": "Remote control link",
   "webRemoteControl.linkPending": "The remote control link will appear here once ready.",
   "webRemoteControl.singlePageNote":

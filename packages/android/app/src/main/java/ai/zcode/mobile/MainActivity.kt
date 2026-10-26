@@ -1,4 +1,4 @@
-package com.example.zcode_mobile
+package ai.zcode.mobile
 
 import android.Manifest
 import android.content.Intent
@@ -12,16 +12,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.example.zcode_mobile.remote.RemoteControlKeepAliveService
-import com.example.zcode_mobile.remote.RemoteControlRecentLink
-import com.example.zcode_mobile.remote.RemoteControlRecentLinksStore
-import com.example.zcode_mobile.remote.RemoteControlUrlPolicy
-import com.example.zcode_mobile.ui.RemoteControlApp
-import com.example.zcode_mobile.ui.theme.ZcodemobileTheme
+import ai.zcode.mobile.remote.DirectServer
+import ai.zcode.mobile.remote.DirectServerSaveResult
+import ai.zcode.mobile.remote.DirectServerStore
+import ai.zcode.mobile.remote.RemoteControlKeepAliveService
+import ai.zcode.mobile.remote.RemoteControlRecentLink
+import ai.zcode.mobile.remote.RemoteControlRecentLinksStore
+import ai.zcode.mobile.remote.RemoteControlUrlPolicy
+import ai.zcode.mobile.ui.RemoteControlApp
+import ai.zcode.mobile.ui.theme.ZcodemobileTheme
 
 class MainActivity : ComponentActivity() {
     private var remoteUrl by mutableStateOf<String?>(null)
     private var recentLinks by mutableStateOf<List<RemoteControlRecentLink>>(emptyList())
+    private var directServers by mutableStateOf<List<DirectServer>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +34,7 @@ class MainActivity : ComponentActivity() {
             android.webkit.WebView.setWebContentsDebuggingEnabled(true)
         }
         recentLinks = RemoteControlRecentLinksStore.read(this)
+        directServers = DirectServerStore.read(this)
 
         val restoredRemoteUrl = savedInstanceState?.getString(KEY_REMOTE_URL)
         val launchRemoteUrl = restoredRemoteUrl ?: resolveRemoteUrlFromIntent(intent)
@@ -40,9 +45,13 @@ class MainActivity : ComponentActivity() {
                 RemoteControlApp(
                     remoteUrl = remoteUrl,
                     recentLinks = recentLinks,
+                    directServers = directServers,
                     onOpenUrl = ::openRemoteUrl,
                     onCloseRemote = ::closeRemote,
                     onClearRecentLinks = ::clearRecentLinks,
+                    onAddDirectServer = ::addDirectServer,
+                    onConnectDirectServer = ::connectDirectServer,
+                    onDeleteDirectServer = ::deleteDirectServer,
                 )
             }
         }
@@ -60,7 +69,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openRemoteUrl(rawUrl: String): Boolean {
-        val resolvedUrl = RemoteControlUrlPolicy.resolve(rawUrl) ?: return false
+        val resolvedUrl = RemoteControlUrlPolicy.resolve(rawUrl, DirectServerStore.savedOrigins(this))
+            ?: return false
         recentLinks = RemoteControlRecentLinksStore.record(this, resolvedUrl)
         remoteUrl = resolvedUrl
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -79,19 +89,38 @@ class MainActivity : ComponentActivity() {
         recentLinks = RemoteControlRecentLinksStore.clear(this)
     }
 
+    private fun addDirectServer(address: String, token: String?): DirectServerSaveResult {
+        val result = DirectServerStore.save(this, address, token)
+        if (result is DirectServerSaveResult.Success) {
+            directServers = result.servers
+        }
+        return result
+    }
+
+    private fun connectDirectServer(id: String): Boolean {
+        val server = DirectServerStore.find(this, id) ?: return false
+        // 连接地址按存储构造，随后仍走 openRemoteUrl 的白名单校验，不引入第二条放行路径。
+        return openRemoteUrl(DirectServerStore.buildConnectUrl(server))
+    }
+
+    private fun deleteDirectServer(id: String) {
+        directServers = DirectServerStore.delete(this, id)
+    }
+
     private fun resolveRemoteUrlFromIntent(intent: Intent?): String? {
         if (intent == null) {
             return null
         }
+        val directOrigins = { DirectServerStore.savedOrigins(this) }
 
         intent.getStringExtra(RemoteControlKeepAliveService.EXTRA_REMOTE_URL)?.let { raw ->
-            RemoteControlUrlPolicy.resolve(raw)?.let { return it }
+            RemoteControlUrlPolicy.resolve(raw, directOrigins())?.let { return it }
         }
         intent.data?.let { uri ->
-            RemoteControlUrlPolicy.resolve(uri)?.let { return it }
+            RemoteControlUrlPolicy.resolve(uri, directOrigins())?.let { return it }
         }
         intent.getStringExtra(Intent.EXTRA_TEXT)?.let { raw ->
-            RemoteControlUrlPolicy.resolve(raw)?.let { return it }
+            RemoteControlUrlPolicy.resolve(raw, directOrigins())?.let { return it }
         }
 
         return null

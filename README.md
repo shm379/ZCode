@@ -1,3 +1,13 @@
+<!-- FORK:BEGIN -->
+> **نسخهٔ فورک ZCode** — این نسخهٔ توسعه‌یافته‌ای از ZCode است و علاوه بر کد بالادست شامل:
+>
+> - اپ اندروید ریموت ([packages/android](packages/android/)) برای کنترل دسکتاپ از موبایل
+> - اتصال مستقیم به zcode-server خودمیزبان، بدون relay ابری
+> - خط ریلیز اندروید با تگ `mobile-v*` و انتشار APK
+>
+> راهنمای کامل فورک و همگام‌سازی با upstream: [FORK.md](FORK.md)
+<!-- FORK:END -->
+
 # ZCode
 
 <div align="center">

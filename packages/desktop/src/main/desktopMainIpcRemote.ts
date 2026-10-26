@@ -21,6 +21,7 @@ import {
   type WindowHostRemoteWorkspaceDescriptor,
   type BindRemoteWorkspaceSessionContextResult,
   type TelemetryEventPayload,
+  type WebRemoteControlDirectServerInfo,
 } from "@zcode/shared";
 import { dispatchTaskNotification } from "./desktopNotifications.js";
 import {
@@ -200,6 +201,8 @@ export function registerRemoteIpcHandlers(options: {
   /** 仅由 VITE_ZCODE_E2E_STORE_BRIDGE + test runner 双门禁打开。 */
   finalArmsCustomEventE2EEnabled?: boolean;
   webRemoteControlManager: WebRemoteControlIpcManager;
+  /** 本地直连服务器（docs/direct-server-desktop.md）展示信息查询；main 注入。 */
+  getDirectServerInfo: () => WebRemoteControlDirectServerInfo | null;
   createRemoteWorkspaceSession: (
     win: BrowserWindow,
     target: RemoteTarget,
@@ -314,6 +317,7 @@ export function registerRemoteIpcHandlers(options: {
   registerWebRemoteControlIpcHandlers({
     reportRemoteUsageEvent,
     webRemoteControlManager: options.webRemoteControlManager,
+    getDirectServerInfo: options.getDirectServerInfo,
   });
 
   ipcMain.on(PlatformChannels.OAuthRegisterState, (event, payload: unknown) => {

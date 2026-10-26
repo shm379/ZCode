@@ -14,3 +14,12 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# video2code plugin hook artifacts (not project source)
+out/
+.v2c/
+
+# release signing (never commit)
+keystore.properties
+*.jks
+*.keystore

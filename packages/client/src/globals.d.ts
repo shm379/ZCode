@@ -103,6 +103,10 @@ declare global {
       stopWebRemoteControl(): Promise<void>;
       /** 查询当前窗口 Web 远程控制状态 */
       getWebRemoteControlStatus(): Promise<WebRemoteControlStatus>;
+      /** 查询本地直连服务器展示信息；未启动或旧 preload 下返回 null / undefined */
+      getWebRemoteControlDirectServerInfo?(): Promise<
+        import("@zcode/shared").WebRemoteControlDirectServerInfo | null
+      >;
       /** 订阅当前窗口 Web 远程控制状态变化 */
       onWebRemoteControlStatusChanged?(
         handler: (status: WebRemoteControlStatus) => void,

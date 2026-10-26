@@ -6,9 +6,10 @@ import {
   parseRemoteWorkspaceIdentity,
   PlatformChannels,
   webRemoteControlAuthStateChangeSchema,
-  type WebRemoteControlAuthStateChange,
   type TelemetryEventPayload,
+  type WebRemoteControlAuthStateChange,
   type WebRemoteControlContext,
+  type WebRemoteControlDirectServerInfo,
   type WebRemoteControlStartResult,
   type WebRemoteControlStatus,
 } from "@zcode/shared";
@@ -32,6 +33,8 @@ export interface WebRemoteControlIpcManager {
 interface WebRemoteControlIpcDependencies {
   reportRemoteUsageEvent: (rendererId: number, event: TelemetryEventPayload) => void;
   webRemoteControlManager: WebRemoteControlIpcManager;
+  /** 本地直连服务器（docs/direct-server-desktop.md）展示信息；未启动返回 null。 */
+  getDirectServerInfo: () => WebRemoteControlDirectServerInfo | null;
 }
 
 function reportRemoteUsageEventSafely(
@@ -137,4 +140,8 @@ export function registerWebRemoteControlIpcHandlers(
       ? dependencies.webRemoteControlManager.getStatus(win.id)
       : { status: "idle" as const };
   });
+
+  ipcMain.handle(PlatformChannels.GetWebRemoteControlDirectServerInfo, () =>
+    dependencies.getDirectServerInfo(),
+  );
 }

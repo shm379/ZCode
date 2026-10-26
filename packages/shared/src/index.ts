@@ -248,6 +248,7 @@ export type {
   UpdateStatePayload,
   WSLDistro,
   WindowControlsOverlayReadyPayload,
+  WebRemoteControlDirectServerInfo,
   ZCodeStdioTapDevState,
 } from "./platform.js";
 export type {

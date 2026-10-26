@@ -301,6 +301,9 @@ contextBridge.exposeInMainWorld("zcode", {
   stopWebRemoteControl: (): Promise<void> =>
     ipcRenderer.invoke(PlatformChannels.StopWebRemoteControl),
   getWebRemoteControlStatus: () => ipcRenderer.invoke(PlatformChannels.GetWebRemoteControlStatus),
+  getWebRemoteControlDirectServerInfo: (): Promise<
+    import("@zcode/shared").WebRemoteControlDirectServerInfo | null
+  > => ipcRenderer.invoke(PlatformChannels.GetWebRemoteControlDirectServerInfo),
   onWebRemoteControlStatusChanged: (
     callback: (status: WebRemoteControlStatus) => void,
   ): (() => void) => {
