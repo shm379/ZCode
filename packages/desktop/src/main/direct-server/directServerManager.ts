@@ -14,17 +14,20 @@ import type { WebRemoteControlDirectServerInfo } from "@zcode/shared";
 import { resolveZCodeBuiltinProviderConfigFilePath } from "../desktopProviderConfig.js";
 
 /**
- * Desktop 本地直连服务器（局域网直连 + QR）。
- * 规范：docs/direct-server-desktop.md —— 本模块是 token/port 文件与服务器生命周期的唯一所有者。
+ * Desktop local direct server (LAN direct connect + QR).
+ * Spec: docs/direct-server-desktop.md — this module is the sole owner of the
+ * token/port file and of the server lifecycle.
  *
- * 与自托管 @zcode/server 入口（packages/server/src/entry-http.ts）同构：同一 createHttpServer
- * 核心、同一 token 语义（?token= → HttpOnly zcode_lite_token）、/ws 永远是
- * web-remote-replayable。区别只在：跑在 Desktop main 进程内、随桌面退出屏障统一收口。
+ * Isomorphic to the self-hosted @zcode/server entrypoint
+ * (packages/server/src/entry-http.ts): the same createHttpServer core, the same
+ * token semantics (?token= → HttpOnly zcode_lite_token), and /ws is always
+ * web-remote-replayable. The only differences: it runs inside the Desktop main
+ * process and is torn down together with the desktop quit barrier.
  */
 
 const log = createServiceLogger("desktop-direct-server");
 
-/** 偏好端口与 Android 文档、自托管 Server 默认值保持一致。 */
+/** Preferred port kept aligned with the Android docs and the self-hosted server default. */
 const DEFAULT_PREFERRED_PORT = 3030;
 
 export interface DirectServerTokenFile {
@@ -48,8 +51,9 @@ function resolveTokenFilePath(): string {
 }
 
 export function buildDesktopServerId(hostName: string = hostname()): string {
-  // serverId 进入 workspace 身份键（remote:server:<id>:…），必须稳定且 identity-safe；
-  // 这里与 shared 的 normalizeServerIdForIdentity 同规则收敛，但不额外导出内部工具。
+  // serverId enters the workspace identity key (remote:server:<id>:…), so it must be
+  // stable and identity-safe; normalize with the same rules as shared's
+  // normalizeServerIdForIdentity, without exporting that internal helper.
   const normalized =
     hostName
       .trim()
@@ -59,7 +63,7 @@ export function buildDesktopServerId(hostName: string = hostname()): string {
   return `desktop-${normalized}`;
 }
 
-/** 解析 token 文件内容；版本、token 形态或端口非法时返回 null（调用方重新生成）。 */
+/** Parse the token file contents; return null when the version, token shape or port is invalid (the caller regenerates). */
 export function parseDirectServerTokenFile(raw: string): DirectServerTokenFile | null {
   let parsed: Partial<DirectServerTokenFile>;
   try {
@@ -93,7 +97,8 @@ async function readTokenFile(): Promise<DirectServerTokenFile | null> {
 async function writeTokenFile(content: DirectServerTokenFile): Promise<void> {
   const filePath = resolveTokenFilePath();
   await mkdir(join(filePath, ".."), { recursive: true });
-  // 原子写入 + 0600：token 文件是局域网入口的唯一凭据，不能出现半截内容或宽松权限。
+  // Atomic write + 0600: the token file is the sole credential for the LAN entrypoint;
+  // never leave a half-written file or loose permissions behind.
   const tmpPath = `${filePath}.${process.pid}.tmp`;
   await writeFile(tmpPath, `${JSON.stringify(content, null, 2)}\n`, { mode: 0o600 });
   await rename(tmpPath, filePath);
@@ -113,8 +118,9 @@ function isPortFree(port: number): Promise<boolean> {
 }
 
 /**
- * 偏好端口空闲就用它；被占或非法时让系统分配一个空闲端口。
- * 探测与真实 listen 之间有极小竞态，由服务器 error 监听兜底记日志。
+ * Use the preferred port when free; when taken or invalid, let the system allocate
+ * a free port. A tiny race remains between the probe and the real listen; the
+ * server's error listener is the backstop that logs it.
  */
 export async function pickListenPort(options: {
   preferred: number;
@@ -155,7 +161,8 @@ function collectLanIps(): string[] {
 async function resolveStaticRoot(): Promise<string | undefined> {
   const staticRoot = process.env["ZCODE_WEB_STATIC_ROOT"]?.trim() || undefined;
   if (!staticRoot) return undefined;
-  // 只在目录存在时交给服务器；不存在时如实按「未配置」处理，不假装有页面。
+  // Only hand the server a directory that actually exists; otherwise treat it honestly
+  // as "not configured" instead of pretending pages are there.
   try {
     const staticRootStat = await stat(staticRoot);
     return staticRootStat.isDirectory() ? staticRoot : undefined;
@@ -181,7 +188,7 @@ export function getDesktopDirectServerInfo(): WebRemoteControlDirectServerInfo |
   };
 }
 
-/** 启动本地直连服务器；幂等（已在跑或正在启动时直接返回）。失败不抛出，只记日志。 */
+/** Start the local direct server; idempotent (returns immediately when running or starting). Failures are logged, never thrown. */
 export async function startDesktopDirectServer(): Promise<void> {
   if (runtime || startPromise) {
     return;
@@ -189,7 +196,8 @@ export async function startDesktopDirectServer(): Promise<void> {
   startPromise = (async () => {
     try {
       const providerConfigFilePath = resolveZCodeBuiltinProviderConfigFilePath();
-      const persisted = (await readTokenFile()) ?? {
+      const persistedFromFile = await readTokenFile();
+      const persisted = persistedFromFile ?? {
         version: 1 as const,
         token: randomBytes(32).toString("hex"),
         port: DEFAULT_PREFERRED_PORT,
@@ -199,7 +207,8 @@ export async function startDesktopDirectServer(): Promise<void> {
         await createServerHostServices({
           sourceServerId: buildDesktopServerId(),
           zcodeBuiltinProviderConfigFilePath: providerConfigFilePath,
-          // 手机 replayable 客户端用不到跨 Environment 的 Provisioning 写入；保持最小权限。
+          // The mobile replayable client never uses cross-Environment Provisioning
+          // writes; keep the least privilege.
           providerProvisioningTargetEnabled: false,
         });
       const staticRoot = await resolveStaticRoot();
@@ -214,12 +223,23 @@ export async function startDesktopDirectServer(): Promise<void> {
         authRequired: true,
         ...(staticRoot ? { staticRoot, spaFallback: true } : {}),
       });
-      // 探测后的竞态或权限问题会让 listen 失败：不吞掉未处理 error（会让整个 main 崩溃），
-      // 只记日志并保持进程存活；UI 读不到信息时如实隐藏直连区块。
+      // Post-probe races or permission problems can make listen fail: never swallow the
+      // unhandled error (it would crash the whole main process); log it and keep the
+      // process alive. When info is unavailable the UI honestly hides the direct
+      // connect section.
       server.on("error", (error: unknown) => {
+        // Bugfix: post-probe listen failures (e.g. an EADDRINUSE race) leave `runtime`
+        // pointing at a server nothing listens on, so the UI would show a QR/URL for a
+        // dead port. Tear the runtime down through the regular dispose path instead;
+        // info reads return null afterwards and the UI hides the section honestly.
+        void disposeDesktopDirectServer();
         log.error("direct-server-listen-error", error);
       });
-      if (port !== persisted.port) {
+      // Bugfix: on a fresh install whose preferred port is free, port === persisted.port,
+      // so gating the write on a port change alone never persisted the freshly generated
+      // token — it silently rotated on every restart and phones with the saved origin got
+      // 401 (spec: token is generated once and the QR stays valid across restarts).
+      if (!persistedFromFile || port !== persisted.port) {
         await writeTokenFile({ ...persisted, port });
       }
       runtime = { services, server, port, token: persisted.token };
@@ -237,7 +257,7 @@ export async function startDesktopDirectServer(): Promise<void> {
   await startPromise;
 }
 
-/** 关闭服务器并释放 services 图；在桌面退出屏障内调用，未启动时是 no-op。 */
+/** Close the server and release the services graph; call inside the desktop quit barrier, no-op when not started. */
 export async function disposeDesktopDirectServer(): Promise<void> {
   const current = runtime;
   runtime = null;
@@ -245,8 +265,9 @@ export async function disposeDesktopDirectServer(): Promise<void> {
     return;
   }
   await new Promise<void>((resolve) => {
-    // Node ≥19 提供 closeIdleConnections；keep-alive 空闲连接不清掉会让 close 回调
-    // 迟迟不触发，拖住退出屏障的预算（同 zcode-server-cli 关闭 WS 排空的理由）。
+    // Node ≥19 provides closeIdleConnections; without dropping idle keep-alive
+    // connections the close callback fires late and eats into the quit-barrier
+    // budget (same reason zcode-server-cli drains WS on close).
     (current.server as { closeIdleConnections?: () => void }).closeIdleConnections?.();
     current.server.close(() => resolve());
   });

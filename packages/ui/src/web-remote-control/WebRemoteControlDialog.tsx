@@ -272,7 +272,8 @@ export const WebRemoteControlDialog = memo(function WebRemoteControlDialogCompon
 
     const loadDirectServerInfo = async () => {
       try {
-        // 平台不支持（Web / 旧 preload）或服务器未启动时为 null，直连区块整体隐藏。
+        // null when the platform is unsupported (web / old preload) or the server is not
+        // started; the whole direct-connect section stays hidden.
         const info = (await platform.getWebRemoteControlDirectServerInfo?.()) ?? null;
         if (!cancelled) {
           setDirectInfo(info);
@@ -311,7 +312,7 @@ export const WebRemoteControlDialog = memo(function WebRemoteControlDialogCompon
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
-        logger.error("[WebRemoteControlDialog] 生成直连二维码失败", message);
+        logger.error("[WebRemoteControlDialog] failed to generate direct-connect QR code", message);
       });
 
     return () => {
@@ -375,13 +376,13 @@ export const WebRemoteControlDialog = memo(function WebRemoteControlDialogCompon
     try {
       await navigator.clipboard.writeText(directInfo.url);
       toast(intl.formatMessage({ id: "webRemoteControl.direct.copied" }));
-      logger.info("[WebRemoteControlDialog] 已复制局域网直连链接", {
+      logger.info("[WebRemoteControlDialog] copied LAN direct-connect link", {
         port: directInfo.port,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       toast(intl.formatMessage({ id: "webRemoteControl.direct.copyFailed" }, { error: message }));
-      logger.error("[WebRemoteControlDialog] 复制局域网直连链接失败", message);
+      logger.error("[WebRemoteControlDialog] failed to copy LAN direct-connect link", message);
     }
   };
 

@@ -4,24 +4,29 @@ import java.net.URI
 import java.net.URLDecoder
 
 /**
- * 扫码直连草稿：从二维码原始文本解析「自托管 zcode-server 直连地址 + 可选令牌」。
- * 纯 JVM 实现，不依赖 android 类，可在本地单元测试直接覆盖。
+ * QR-scan direct-connect draft: parses "self-hosted zcode-server direct address +
+ * optional token" from the raw QR text.
+ * Pure JVM implementation with no android dependency, so local unit tests can cover
+ * it directly.
  *
- * 定位：扫描内容先走 [RemoteControlUrlRules.resolve]（relay / deep link / 已保存直连），
- * 只有 resolve 失败后才尝试 [fromUrl]。因此这里与导航白名单保持同一判定边界：仅接受
- * http/https、根路径、查询只含 token 的地址；relay 域名与 deep link 一律返回 null
- * （它们各自的原有路径不变），不引入第二条放行路径。
+ * Positioning: scanned content first goes through [RemoteControlUrlRules.resolve]
+ * (relay / deep link / saved direct); only when resolve fails do we try [fromUrl].
+ * This keeps the same acceptance boundary as the navigation allowlist: only accept
+ * http/https, root path, and a query containing only token; relay hosts and deep
+ * links always return null (their original paths stay unchanged), so no second
+ * acceptance path is introduced.
  */
 data class DirectServerDraft(
-    /** 归一化 origin（scheme://host[:port]），可直接作为 DirectServerStore.save 的地址。 */
+    /** Normalized origin (scheme://host[:port]), usable directly as the address for DirectServerStore.save. */
     val address: String,
-    /** 确认弹窗展示用 host[:port]（与 origin 一致，仅去掉 scheme 前缀）。 */
+    /** host[:port] shown in the confirmation dialog (same as origin, only the scheme prefix removed). */
     val label: String,
-    /** ?token= 解码后的令牌；无 token 查询或值为空时为 null。 */
+    /** Token decoded from ?token=; null when there is no token query or the value is empty. */
     val token: String?,
 ) {
     companion object {
-        // 与 RemoteControlUrlRules 的 relay 域名一致；规则文件不改，这里单独声明。
+        // Same relay host as RemoteControlUrlRules; the rules file stays untouched,
+        // so it is declared separately here.
         private const val RELAY_HOST = "zcode.z.ai"
 
         fun fromUrl(raw: String?): DirectServerDraft? {
@@ -35,7 +40,8 @@ data class DirectServerDraft(
                 return null
             }
             val host = uri.host?.lowercase()?.takeIf { it.isNotEmpty() } ?: return null
-            // relay 域名属于官方远控入口，永远走原 resolve 流程，不当作自托管服务器保存。
+            // The relay host is the official remote-control entry; it always goes through
+            // the original resolve flow and is never saved as a self-hosted server.
             if (host == RELAY_HOST) {
                 return null
             }
@@ -43,9 +49,11 @@ data class DirectServerDraft(
             if (path.isNotEmpty() && path != "/") {
                 return null
             }
-            // Bugfix: 空 token（?token=）是合法输入（与白名单规则一致），只是令牌记为 null；
-            // 因此「无查询/空值」与「查询非法」必须分开：extractToken 仅用 null 表示非法，
-            // 空值在此处统一折叠为 null 令牌，避免合法的 ?token= 被整条草稿作废。
+            // Bugfix: an empty token (?token=) is valid input (consistent with the allowlist
+            // rules); only the token is recorded as null. So "no query / empty value" must be
+            // distinguished from "invalid query": extractToken uses null only for invalid,
+            // and an empty value is folded into a null token here, so a valid ?token= is not
+            // rejected together with the whole draft.
             val token: String?
             if (uri.rawQuery.isNullOrEmpty()) {
                 token = null
@@ -62,10 +70,13 @@ data class DirectServerDraft(
         }
 
         /**
-         * 与 RemoteControlUrlRules 的直连查询规则一致：查询键只允许 token，其余键说明
-         * 这不是壳自己拼出的连接地址。取第一个 token 值并按 query 规则解码（URLDecoder
-         * 与 DirectServerStore.buildConnectUrl 的 URLEncoder 互逆）。
-         * 返回 null 仅表示查询非法或解码失败；token 值为空时返回空串（合法），由调用方折叠。
+         * Consistent with RemoteControlUrlRules' direct-connect query rules: the only
+         * allowed query key is token; any other key means this URL was not assembled
+         * by the shell itself. Takes the first token value and decodes it per the query
+         * rules (URLDecoder is the inverse of DirectServerStore.buildConnectUrl's
+         * URLEncoder).
+         * Returning null only means the query is invalid or decoding failed; an empty
+         * token value returns the empty string (valid) for the caller to fold.
          */
         private fun extractToken(rawQuery: String): String? {
             var token: String? = null

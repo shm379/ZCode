@@ -1,30 +1,35 @@
 #!/usr/bin/env node
-// publish-apk-nabuxai.mjs — Nabu APK Hub (apk.nabuxai.com) 发布/排队状态检查脚本
+// publish-apk-nabuxai.mjs — Nabu APK Hub (apk.nabuxai.com) publish/queue status script
 //
-// 诚实声明（2026-10-26 实地核查结论）：
-// - apk.nabuxai.com 没有任何公开的 API 文档（/api、/docs、/robots.txt 均 404）。
-// - 首页前端 JS 反推出来它是一个「构建排队」服务而不是 APK 上传服务：
+// Honest disclosure (findings from on-site inspection, 2026-10-26):
+// - apk.nabuxai.com has no public API documentation at all (/api, /docs and /robots.txt all 404).
+// - Reverse-engineering the homepage frontend JS shows it is a "build queue" service,
+//   not an APK upload service:
 //     GET  /api/apps             → { apps: [{ name, ref, enabled, latest: { artifactUrls } }] }
 //     GET  /api/builds           → { builds: [{ id, app, status, gitUrl, commit, artifacts }] }
-//     POST /api/builds {app}     → 需要请求头 x-admin-token（无 token 返回 401）
-//     POST /api/builds/:id/cancel、GET /api/builds/:id/logs（同样需要 x-admin-token）
-//     成品文件在 /f/<app>/<file>，对象存储约定为 apk/<app>/
-//   worker 按 app 登记的 gitUrl 自行 clone+构建，**不接收上传的 APK/AAB 文件**。
-//   以上端点为从站点自身前端代码观察所得，未经官方文档背书，可能随时变化。
-// - 截至本日，hub 上没有为本仓库注册的 app（现有 app 只有 udrive-partner / udrive），
-//   因此本脚本默认只做只读探测；真正的排队需要 hub 管理员在服务端登记 app。
+//     POST /api/builds {app}     → requires the x-admin-token header (401 without a token)
+//     POST /api/builds/:id/cancel and GET /api/builds/:id/logs (also need x-admin-token)
+//     Artifacts live under /f/<app>/<file>; object storage layout is apk/<app>/
+//   The worker clones and builds itself from the gitUrl registered per app, and
+//   **does not accept uploaded APK/AAB files**.
+//   The endpoints above were observed from the site's own frontend code; they are not
+//   backed by official docs and may change at any time.
+// - As of this date, no app for this repository is registered on the hub (the only
+//   existing apps are udrive-partner / udrive), so by default this script only does
+//   read-only probing; actually queueing requires a hub admin to register the app server-side.
 //
-// 用法：
-//   node scripts/publish-apk-nabuxai.mjs                 # 只读：检查 hub 状态与 zcode app 是否已登记
-//   node scripts/publish-apk-nabuxai.mjs --enqueue       # 若 app 已登记且 NABUX_APKHUB_TOKEN 已设置，则排队一次构建
+// Usage:
+//   node scripts/publish-apk-nabuxai.mjs                 # read-only: check hub status and whether the zcode app is registered
+//   node scripts/publish-apk-nabuxai.mjs --enqueue       # if the app is registered and NABUX_APKHUB_TOKEN is set, queue one build
 //
-// 手动发布指引（当 API 未登记时）：
-//   1. 找 hub 管理员登记 app：name=zcode-mobile、gitUrl=https://github.com/shm379/ZCode.git、ref=main（或 mobile-v* 标签）。
-//   2. 登记 app 后：export NABUX_APKHUB_TOKEN=<向管理员索取的 admin token> 再运行 --enqueue。
-//   3. 构建完成后从 GET /api/apps 的 latest.artifactUrls 或 /f/zcode-mobile/<file> 取 APK 链接。
-//   4. 此前发布 APK 的兜底渠道是 GitHub Release（tag mobile-v* 自动触发 .github/workflows/android-release.yml）。
+// Manual publish guide (when the API app is not registered):
+//   1. Ask a hub admin to register the app: name=zcode-mobile, gitUrl=https://github.com/shm379/ZCode.git, ref=main (or a mobile-v* tag).
+//   2. After registration: export NABUX_APKHUB_TOKEN=<admin token requested from the admin> and run --enqueue.
+//   3. Once the build finishes, take the APK link from GET /api/apps latest.artifactUrls or /f/zcode-mobile/<file>.
+//   4. The fallback channel for previous APK releases is GitHub Release (tag mobile-v* triggers .github/workflows/android-release.yml automatically).
 //
-// 本脚本不会读取、打印或存储任何 token；token 只通过环境变量 NABUX_APKHUB_TOKEN 传入。
+// This script never reads, prints or stores any token; the token is passed in only
+// through the NABUX_APKHUB_TOKEN environment variable.
 
 const HUB_BASE = process.env.NABUX_APKHUB_BASE_URL ?? 'https://apk.nabuxai.com';
 const APP_NAME = process.env.NABUX_APKHUB_APP ?? 'zcode-mobile';
@@ -39,44 +44,44 @@ async function getJson(path) {
 
 async function main() {
   console.log(`Nabu APK Hub: ${HUB_BASE}`);
-  console.log('注意：该站点没有公开 API 文档；以下端点从站点前端 JS 反推，未获官方文档背书。\n');
+  console.log('Note: this site has no public API docs; the endpoints below were reverse-engineered from its frontend JS and are not backed by official documentation.\n');
 
   let apps = [];
   try {
     const body = await getJson('/api/apps');
     apps = body.apps ?? [];
-    console.log(`已登记 app：${apps.length} 个`);
+    console.log(`Registered apps: ${apps.length}`);
     for (const app of apps) {
       const latest = app.latest
-        ? `${app.latest.status} @ ${app.latest.commit ?? '?'}（${(app.latest.artifactUrls ?? []).map((a) => a.url).join(', ') || '无产物链接'}）`
-        : '尚无成功构建';
-      console.log(`  - ${app.name}  [${app.enabled ? 'enabled' : 'disabled'}]  ref=${app.ref}  最新: ${latest}`);
+        ? `${app.latest.status} @ ${app.latest.commit ?? '?'} (${(app.latest.artifactUrls ?? []).map((a) => a.url).join(', ') || 'no artifact links'})`
+        : 'no successful build yet';
+      console.log(`  - ${app.name}  [${app.enabled ? 'enabled' : 'disabled'}]  ref=${app.ref}  latest: ${latest}`);
     }
   } catch (err) {
-    console.error(`读取 /api/apps 失败：${err.message}`);
+    console.error(`Failed to read /api/apps: ${err.message}`);
     process.exit(1);
   }
 
   const app = apps.find((a) => a.name === APP_NAME);
   if (!app) {
-    console.log(`\n本仓库（${APP_NAME}）尚未在 hub 登记 → 无法排队构建。`);
-    console.log('手动步骤：请 hub 管理员在服务端登记 app（见本文件头部注释），或直接使用 GitHub Release 渠道。');
+    console.log(`\nThis repository (${APP_NAME}) is not registered on the hub → cannot queue a build.`);
+    console.log('Manual step: ask a hub admin to register the app server-side (see the header comments in this file), or use the GitHub Release channel directly.');
     process.exit(2);
   }
   if (!app.enabled) {
-    console.log(`\n${APP_NAME} 已登记但 disabled（not migrated yet）→ 无法排队构建。`);
+    console.log(`\n${APP_NAME} is registered but disabled (not migrated yet) → cannot queue a build.`);
     process.exit(2);
   }
 
   if (!enqueue) {
-    console.log(`\n${APP_NAME} 已登记且可用。加 --enqueue（并 export NABUX_APKHUB_TOKEN=…）可排队一次构建。`);
-    if (app.latest) console.log('当前最新产物：');
+    console.log(`\n${APP_NAME} is registered and usable. Run with --enqueue (and export NABUX_APKHUB_TOKEN=…) to queue one build.`);
+    if (app.latest) console.log('Current latest artifacts:');
     for (const a of app.latest?.artifactUrls ?? []) console.log(`  ${a.url}`);
     return;
   }
 
   if (!token) {
-    console.error('\n--enqueue 需要 NABUX_APKHUB_TOKEN 环境变量（向 hub 管理员索取）。未设置，退出。');
+    console.error('\n--enqueue requires the NABUX_APKHUB_TOKEN environment variable (request it from the hub admin). Not set, exiting.');
     process.exit(2);
   }
 
@@ -87,10 +92,10 @@ async function main() {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error(`排队失败：HTTP ${res.status} ${body.error ?? ''}`);
+    console.error(`Failed to queue build: HTTP ${res.status} ${body.error ?? ''}`);
     process.exit(1);
   }
-  console.log(`已排队构建：id=${body.id}；用 GET /api/builds 观察状态，完成后从 /f/${APP_NAME}/ 取产物。`);
+  console.log(`Build queued: id=${body.id}; watch status with GET /api/builds and fetch artifacts from /f/${APP_NAME}/ when done.`);
 }
 
 main().catch((err) => {

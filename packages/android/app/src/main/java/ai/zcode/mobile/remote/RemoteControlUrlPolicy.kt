@@ -4,11 +4,13 @@ import android.net.Uri
 import ai.zcode.mobile.BuildConfig
 
 /**
- * 远控 URL 白名单入口。纯判定逻辑在 [RemoteControlUrlRules]（JVM 可测），
- * 这里只负责把 Android 侧输入（android.net.Uri、BuildConfig）接进去。
+ * Allowlist entrypoint for remote-control URLs. The pure decision logic lives in
+ * [RemoteControlUrlRules] (JVM-testable); this only wires in the Android-side inputs
+ * (android.net.Uri, BuildConfig).
  *
- * directServerOrigins 是用户保存的直连 zcode-server origin 集合，由调用方
- * 从 [DirectServerStore] 读取后传入；判定本身不读存储，保持无副作用。
+ * directServerOrigins is the set of user-saved direct-connect zcode-server origins,
+ * read from [DirectServerStore] by the caller; the decision itself never touches
+ * storage and stays side-effect free.
  */
 object RemoteControlUrlPolicy {
     fun resolve(raw: String?, directServerOrigins: Set<String> = emptySet()): String? =

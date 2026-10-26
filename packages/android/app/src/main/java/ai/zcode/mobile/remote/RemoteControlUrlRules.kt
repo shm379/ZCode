@@ -3,14 +3,17 @@ package ai.zcode.mobile.remote
 import java.net.URI
 
 /**
- * 纯 JVM 的远控 URL 判定规则，不依赖 android.net.Uri / BuildConfig，
- * 因此可以在本地单元测试里同时覆盖 debug 与 release 行为。
+ * Pure-JVM remote-control URL decision rules, with no dependency on android.net.Uri /
+ * BuildConfig, so local unit tests can cover both debug and release behavior.
  *
- * 三类放行来源（按优先级）：
- * 1. 官方 relay：https://zcode.z.ai/remote*；
- * 2. 用户保存的直连 zcode-server：origin 完全一致 + 根路径 + 仅 token 查询参数；
- * 3. debug 构建额外放开测试域与本机/局域网 /remote 页面（真机调试 Vite 用）。
- * 除此之外一律不放行，远控壳不能退化成任意浏览器。
+ * Three accepted source classes (by priority):
+ * 1. Official relay: https://zcode.z.ai/remote*;
+ * 2. User-saved direct-connect zcode-server: exact origin match + root path +
+ *    token-only query parameter;
+ * 3. Debug builds additionally allow test domains and local/LAN /remote pages
+ *    (for debugging against Vite on a real device).
+ * Anything else is rejected; the remote-control shell must never degrade into a
+ * general-purpose browser.
  */
 data class RemoteControlUrlPolicyConfig(
     val debug: Boolean,
@@ -72,7 +75,8 @@ object RemoteControlUrlRules {
             return false
         }
 
-        // debug 包放开测试域/局域网的 /remote 页面；生产包仍只认 zcode.z.ai 与已保存直连服务器。
+        // Debug builds open /remote pages on test domains/LAN; release builds still only
+        // accept zcode.z.ai and saved direct servers.
         val path = uri.rawPath.orEmpty()
         if (!path.startsWith("/remote")) {
             return false
@@ -86,7 +90,7 @@ object RemoteControlUrlRules {
     fun normalizeOrigin(scheme: String, host: String, port: Int): String {
         val defaultPort = if (scheme == "https") 443 else 80
         val effectivePort = if (port > 0) port else defaultPort
-        // IPv6 host 需要重新加上方括号，否则 origin 字符串不合法。
+        // IPv6 hosts need the square brackets re-added, otherwise the origin string is invalid.
         val hostPart = if (host.contains(':')) "[$host]" else host
         return if (effectivePort == defaultPort) {
             "$scheme://$hostPart"
@@ -99,8 +103,9 @@ object RemoteControlUrlRules {
 
     private fun isDeepLink(uri: URI): Boolean = uri.scheme == "zcode" && uri.host == "remote"
 
-    // 深链把 query/fragment 平移到默认远控地址，沿用 raw 部件避免二次编码，
-    // 与旧实现（encodedQuery/encodedFragment 平移）行为一致。
+    // The deep link moves query/fragment onto the default remote-control URL, reusing the
+    // raw parts to avoid double encoding, matching the old implementation's behavior
+    // (encodedQuery/encodedFragment passthrough).
     private fun rewriteDefaultRemoteUrl(deepLink: URI, defaultRemoteUrl: String): String {
         val base = parse(defaultRemoteUrl) ?: return defaultRemoteUrl
         val builder = StringBuilder()
@@ -116,8 +121,9 @@ object RemoteControlUrlRules {
     private fun isRootPath(rawPath: String?): Boolean =
         rawPath.isNullOrEmpty() || rawPath == "/"
 
-    // 直连服务器仅允许 token 查询参数（服务端用它引导 HttpOnly cookie）。
-    // 其它查询键说明这不是壳自己拼出的连接地址，直接拒绝而不是猜意图。
+    // Direct servers only allow the token query parameter (the server uses it to seed
+    // the HttpOnly cookie). Any other query key means the URL was not assembled by the
+    // shell itself; reject it outright instead of guessing intent.
     private fun hasOnlyDirectServerQuery(rawQuery: String?): Boolean {
         if (rawQuery.isNullOrEmpty()) {
             return true

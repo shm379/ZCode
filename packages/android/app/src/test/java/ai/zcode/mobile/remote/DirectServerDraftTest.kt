@@ -5,12 +5,13 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * 扫码直连草稿解析的 JVM 单测：fromUrl 与导航白名单共用同一套边界
- * （http/https + 根路径 + 仅 token 查询），relay 与 deep link 不进入直连保存流程。
+ * JVM unit tests for QR direct-connect draft parsing: fromUrl shares the same
+ * boundary as the navigation allowlist (http/https + root path + token-only query);
+ * relay and deep links never enter the direct-save flow.
  */
 class DirectServerDraftTest {
 
-    // ---------- 解析成功 ----------
+    // ---------- successful parsing ----------
 
     @Test
     fun `extracts plain token from root url`() {
@@ -28,7 +29,8 @@ class DirectServerDraftTest {
     fun `extracts percent-encoded token`() {
         val draft = DirectServerDraft.fromUrl("https://zcode.example.com/?token=a%2Bb%3Dc%20d")
         assertEquals("a+b=c d", draft?.token)
-        // https 默认端口归一化进 origin，label 去掉 scheme 前缀用于确认弹窗展示。
+        // The https default port is normalized into the origin; label drops the scheme
+        // prefix for display in the confirmation dialog.
         assertEquals("https://zcode.example.com", draft?.address)
         assertEquals("zcode.example.com", draft?.label)
     }
@@ -65,7 +67,7 @@ class DirectServerDraftTest {
         )
     }
 
-    // ---------- 拒绝 ----------
+    // ---------- rejection ----------
 
     @Test
     fun `non-root path is rejected`() {
@@ -82,7 +84,7 @@ class DirectServerDraftTest {
     @Test
     fun `relay url is rejected`() {
         assertNull(DirectServerDraft.fromUrl("https://zcode.z.ai/remote?sid=1&mid=2"))
-        // relay 域名即使形态像直连地址也不能保存为自托管服务器。
+        // Even when a relay host looks like a direct address, it must not be saved as a self-hosted server.
         assertNull(DirectServerDraft.fromUrl("https://zcode.z.ai/?token=abc"))
     }
 

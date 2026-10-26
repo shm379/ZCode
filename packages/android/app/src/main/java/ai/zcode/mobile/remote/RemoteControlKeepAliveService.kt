@@ -21,9 +21,12 @@ class RemoteControlKeepAliveService : Service() {
         val remoteUrl = intent?.getStringExtra(EXTRA_REMOTE_URL).orEmpty()
         ensureNotificationChannel()
 
-        // Bugfix: 纯浏览器后台后 WebView/JS/WebSocket 容易被系统暂停或回收。
-        // 前台服务不能保证 WebView socket 永不断，但能给远控会话一个用户可见的保活边界，
-        // 降低进程被杀概率；真正的状态恢复仍交给 web 端 replayable snapshot 协议完成。
+        // Bugfix: with the app in the background, the WebView/JS/WebSocket is easily
+        // suspended or reclaimed by the system. A foreground service cannot guarantee
+        // the WebView socket never drops, but it gives the remote-control session a
+        // user-visible keep-alive boundary and lowers the chance of the process being
+        // killed; real state recovery is still done by the web-side replayable
+        // snapshot protocol.
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_remote_control)
             .setContentTitle(getString(R.string.remote_keep_alive_title))

@@ -99,7 +99,8 @@ class MainActivity : ComponentActivity() {
 
     private fun connectDirectServer(id: String): Boolean {
         val server = DirectServerStore.find(this, id) ?: return false
-        // 连接地址按存储构造，随后仍走 openRemoteUrl 的白名单校验，不引入第二条放行路径。
+        // The connect URL is built from storage and still goes through openRemoteUrl's
+        // allowlist check; no second acceptance path is introduced.
         return openRemoteUrl(DirectServerStore.buildConnectUrl(server))
     }
 

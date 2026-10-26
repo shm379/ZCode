@@ -33,7 +33,7 @@ export interface WebRemoteControlIpcManager {
 interface WebRemoteControlIpcDependencies {
   reportRemoteUsageEvent: (rendererId: number, event: TelemetryEventPayload) => void;
   webRemoteControlManager: WebRemoteControlIpcManager;
-  /** 本地直连服务器（docs/direct-server-desktop.md）展示信息；未启动返回 null。 */
+  /** Local direct server (docs/direct-server-desktop.md) display info; null when not started. */
   getDirectServerInfo: () => WebRemoteControlDirectServerInfo | null;
 }
 

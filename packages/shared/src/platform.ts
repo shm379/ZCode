@@ -625,17 +625,19 @@ export type BindRemoteWorkspaceSessionContextIpcResult =
     };
 
 /**
- * 本地直连服务器（局域网直连 + QR）的一次性展示信息；见 docs/direct-server-desktop.md。
- * 只承载展示所需字段，token 以完整 URL 形式出现，消费方不得写日志或持久化。
+ * One-shot display info for the local direct server (LAN direct connect + QR);
+ * see docs/direct-server-desktop.md.
+ * Carries only the fields needed for display; the token appears inside the full URL,
+ * and consumers must never log it or persist it.
  */
 export interface WebRemoteControlDirectServerInfo {
-  /** 首选候选地址的完整连接 URL：http://<lan-ip>:<port>/?token=<token> */
+  /** Full connection URL of the preferred candidate: http://<lan-ip>:<port>/?token=<token> */
   url: string;
-  /** 服务器实际监听端口（偏好端口被占时会回落到系统分配端口） */
+  /** Port the server actually listens on (falls back to a system-assigned port when the preferred one is taken) */
   port: number;
-  /** 局域网候选 IPv4（按 os.networkInterfaces 顺序），首选候选在前 */
+  /** LAN candidate IPv4 addresses (in os.networkInterfaces order), preferred candidate first */
   lanIps: string[];
-  /** 服务器是否配置了 Web SPA 静态根（ZCODE_WEB_STATIC_ROOT）；未配置时 / 返回 404 */
+  /** Whether the server has a Web SPA static root configured (ZCODE_WEB_STATIC_ROOT); when unset, / returns 404 */
   staticRootConfigured: boolean;
 }
 
@@ -813,13 +815,16 @@ export interface IPlatformService {
   getWebRemoteControlStatus(): Promise<WebRemoteControlStatus>;
 
   /**
-   * Desktop-only：查询本地直连服务器（局域网直连 + QR，见 docs/direct-server-desktop.md）
-   * 的展示信息。未启动或平台不支持时返回 null / 方法缺失，UI 隐藏直连区块。
-   * token 只经此一次性 IPC 提供，不落 renderer 持久化、不进日志。
+   * Desktop-only: query the display info of the local direct server
+   * (LAN direct connect + QR, see docs/direct-server-desktop.md). Returns
+   * null / a missing method when not started or the platform is unsupported;
+   * the UI hides the direct-connect section.
+   * The token is provided only through this one-shot IPC: never into renderer
+   * persistence, never into logs.
    */
   getWebRemoteControlDirectServerInfo?(): Promise<WebRemoteControlDirectServerInfo | null>;
 
-  /** 桌面 OAuth 会话通知；main 独立重读凭据后决定是否恢复远控。 */
+  /** Desktop OAuth session notification; main re-reads credentials independently and decides whether to resume remote control. */
   notifyWebRemoteControlAuthStateChanged?(change: WebRemoteControlAuthStateChange): void;
 
   /** 订阅当前窗口 Web 远程控制状态变化；旧平台可不实现，UI 会保留轮询兜底 */

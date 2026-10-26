@@ -7,8 +7,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 直连服务器与 relay 白名单的 JVM 单测。规则本体不依赖 android 类，
- * 因此 debug/release 行为都能在同一套测试里直接覆盖。
+ * JVM unit tests for the direct-server and relay allowlists. The rules themselves
+ * have no android dependency, so both debug/release behavior can be covered directly
+ * in the same suite.
  */
 class RemoteControlUrlRulesTest {
     private val defaultRemoteUrl = "https://zcode.z.ai/remote"
@@ -21,7 +22,7 @@ class RemoteControlUrlRulesTest {
     )
     private val debugConfig = releaseConfig.copy(debug = true)
 
-    // ---------- relay 官方规则 ----------
+    // ---------- official relay rules ----------
 
     @Test
     fun `release allows https zcode zai remote links`() {
@@ -40,7 +41,7 @@ class RemoteControlUrlRulesTest {
         assertFalse(RemoteControlUrlRules.isAllowed("https://zcode.z.ai/other", releaseConfig))
     }
 
-    // ---------- 直连服务器规则 ----------
+    // ---------- direct-server rules ----------
 
     @Test
     fun `release allows saved origin root with token query`() {
@@ -83,7 +84,7 @@ class RemoteControlUrlRulesTest {
     fun `default https port normalizes to saved portless origin`() {
         assertTrue(RemoteControlUrlRules.isAllowed("https://zcode.example.com/?token=abc", releaseConfig))
         assertTrue(RemoteControlUrlRules.isAllowed("https://zcode.example.com:443/?token=abc", releaseConfig))
-        // 显式 443 与省略端口是同一个 origin，但 80 不是。
+        // Explicit 443 and an omitted port are the same origin, but 80 is not.
         assertFalse(RemoteControlUrlRules.isAllowed("http://zcode.example.com:80/?token=abc", releaseConfig))
     }
 
@@ -92,7 +93,7 @@ class RemoteControlUrlRulesTest {
         assertTrue(RemoteControlUrlRules.isAllowed("http://192.168.1.10:3030/?token=", releaseConfig))
     }
 
-    // ---------- debug 额外放行 ----------
+    // ---------- debug extra allowances ----------
 
     @Test
     fun `debug allows lan and localhost remote pages`() {
@@ -107,7 +108,7 @@ class RemoteControlUrlRulesTest {
         assertFalse(RemoteControlUrlRules.isAllowed("http://evil.example.com/remote", debugConfig))
     }
 
-    // ---------- 深链与空值 ----------
+    // ---------- deep links and empty values ----------
 
     @Test
     fun `deep link rewrites onto default remote url without re-encoding`() {

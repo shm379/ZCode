@@ -1241,8 +1241,9 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
     // remote session、attachment 和 transport 都由窗口 Host 持有；这里先清理
     // Main 的请求关联，再由下方每窗口唯一 Host 的 shutdown barrier 释放真实连接与 Agent。
     remoteSessionManager.disposeAllAndWaitForAppShutdown(reason),
-    // 本地直连服务器与 Host 清理无依赖，进入同一并行屏障；sqlite 句柄与监听端口必须
-    // 在进程退出前收口（spec：docs/direct-server-desktop.md）。
+    // The local direct server has no dependency on Host cleanup and joins the same
+    // parallel barrier; the sqlite handles and the listening port must be closed
+    // before process exit (spec: docs/direct-server-desktop.md).
     (async () => {
       try {
         await disposeDesktopDirectServer();
@@ -2155,9 +2156,11 @@ app.whenReady().then(async () => {
     } catch (error) {
       logger.error("[cron-scheduler] failed to spawn scheduler process:", error);
     }
-    // 本地直连服务器（spec：docs/direct-server-desktop.md）与 scheduler 同一 ready 门：
-    // 等 Host 完成 tasks-index 统一迁移后再开自己的 services 图，避免两个写者抢首迁移。
-    // 启动失败不阻断桌面；远控弹窗读不到信息时如实隐藏直连区块。
+    // The local direct server (spec: docs/direct-server-desktop.md) shares the same
+    // ready gate as the scheduler: wait for the Host to finish the unified tasks-index
+    // migration before opening its own services graph, so two writers never race for
+    // the first migration. A failed start never blocks the desktop; when the remote
+    // dialog cannot read info it honestly hides the direct-connect section.
     void startDesktopDirectServer();
   });
 

@@ -1,5 +1,6 @@
 /**
- * desktop-direct-server 公开入口：main/index.ts 只允许从这里导入（见 architecture-policy.yaml）。
+ * desktop-direct-server public entrypoint: main/index.ts may only import from here
+ * (see architecture-policy.yaml).
  */
 export {
   disposeDesktopDirectServer,

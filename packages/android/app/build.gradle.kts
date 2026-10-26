@@ -8,9 +8,11 @@ private data class ReleaseSigningConfig(
     val keyPassword: String,
 )
 
-// 优先读 packages/android/keystore.properties，其次 ~/.gradle/zcode-android-release.properties；
-// 都不存在或字段不全时返回 null，release 退化为未签名产物而不是构建失败。
-// keystore 与含口令的 properties 不得提交（见 .gitignore 与 docs/mobile-remote-control-android.md）。
+// Prefer packages/android/keystore.properties, then ~/.gradle/zcode-android-release.properties;
+// when neither exists or fields are incomplete, return null so release degrades to an
+// unsigned artifact instead of failing the build.
+// The keystore and any properties file containing passwords must never be committed
+// (see .gitignore and docs/mobile-remote-control-android.md).
 private fun loadReleaseSigningConfig(): ReleaseSigningConfig? {
     val candidates = listOf(
         rootProject.file("keystore.properties"),
@@ -26,7 +28,7 @@ private fun loadReleaseSigningConfig(): ReleaseSigningConfig? {
     val keyAlias = props.getProperty("ZCODE_ANDROID_KEY_ALIAS") ?: return null
     val keyPassword = props.getProperty("ZCODE_ANDROID_KEY_PASSWORD") ?: return null
     if (!storeFile.isFile) {
-        logger.warn("ZCODE_ANDROID_STORE_FILE 指向的文件不存在: ${storeFile.path}；release 将不签名。")
+        logger.warn("File pointed to by ZCODE_ANDROID_STORE_FILE does not exist: ${storeFile.path}; release will be unsigned.")
         return null
     }
     return ReleaseSigningConfig(storeFile, storePassword, keyAlias, keyPassword)
@@ -77,7 +79,8 @@ android {
             buildConfigField("String", "REMOTE_CONTROL_DEFAULT_URL", "\"https://zcode.z.ai/remote\"")
         }
         release {
-            // 直连自托管 zcode-server 放开 http（局域网）；导航安全边界在 RemoteControlUrlPolicy。
+            // Direct self-hosted zcode-server connections need http (LAN); the navigation
+            // security boundary lives in RemoteControlUrlPolicy.
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             releaseSigning?.let { signingConfig = signingConfigs.getByName("release") }
             isMinifyEnabled = false

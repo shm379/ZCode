@@ -20,7 +20,8 @@ object RemoteControlRecentLinksStore {
     fun read(context: Context): List<RemoteControlRecentLink> {
         val raw = prefs(context).getString(KEY_LINKS, null) ?: return emptyList()
         val array = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
-        // 直连服务器链接的合法性依赖当前已保存 origin，校验时一并传入，避免旧条目被误丢。
+        // Whether a direct-server link is valid depends on the currently saved origins;
+        // pass them into the check together so old entries are not dropped by mistake.
         val directOrigins = DirectServerStore.savedOrigins(context)
         return buildList {
             for (index in 0 until array.length()) {

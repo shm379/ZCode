@@ -104,7 +104,8 @@ fun RemoteControlApp(
     val context = LocalContext.current
     var scannerOpen by rememberSaveable { mutableStateOf(false) }
     var launcherError by rememberSaveable { mutableStateOf<String?>(null) }
-    // 扫码直连草稿：不需要跨进程恢复，用户重扫一次即可，普通 remember 即可。
+    // QR direct-connect draft: no cross-process recovery needed — the user can rescan;
+    // a plain remember is enough.
     var pendingDirectDraft by remember { mutableStateOf<DirectServerDraft?>(null) }
     val cameraPermissionDenied = stringResource(R.string.remote_scan_permission_denied)
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -129,15 +130,18 @@ fun RemoteControlApp(
                     scannerOpen = false
                 },
                 onScanned = { raw ->
-                    // 第一优先级保持原行为：relay / 深链 / 已保存直连 origin 直接打开。
+                    // Top priority keeps the original behavior: relay / deep link / saved
+                    // direct origin opens directly.
                     val opened = onOpenUrl(raw)
                     var accepted = opened
                     if (opened) {
                         scannerOpen = false
                         launcherError = null
                     } else {
-                        // 白名单拒绝后再尝试按直连服务器地址解析；成功则先确认再保存+连接，
-                        // 失败维持原有的「二维码无效」提示，壳仍不退化为任意浏览器。
+                        // After the allowlist rejects, try parsing it as a direct-server
+                        // address; on success confirm first, then save + connect, and on
+                        // failure keep the original "invalid QR code" message — the shell
+                        // still never degrades into a general browser.
                         val draft = DirectServerDraft.fromUrl(raw)
                         if (draft == null) {
                             launcherError = context.getString(R.string.remote_scan_invalid)
@@ -192,9 +196,11 @@ fun RemoteControlApp(
                 draft = draft,
                 onConfirm = {
                     pendingDirectDraft = null
-                    // DUPLICATE 理论上不可达（已保存 origin 会先被白名单 resolve 放行），
-                    // 这里兜底改为连接已存在条目而不是报错；连接仍走 onConnectDirectServer
-                    // 的白名单校验，与启动页「直连服务器」区块是同一条路径。
+                    // DUPLICATE is theoretically unreachable (an already-saved origin is
+                    // accepted first by the allowlist resolve); fall back to connecting the
+                    // existing entry instead of erroring. Connecting still goes through
+                    // onConnectDirectServer's allowlist check — the same path as the
+                    // launcher's "direct servers" section.
                     val target = when (val result = onAddDirectServer(draft.address, draft.token)) {
                         is DirectServerSaveResult.Success ->
                             result.servers.lastOrNull { it.origin == draft.address }
@@ -568,8 +574,9 @@ private fun RemoteControlLauncher(
                 OutlinedButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        // Bugfix: 二维码链接很长，用户重启 App 后手输容易出错。
-                        // 这里复用本地已校验过的历史记录，但打开前仍走 onOpenUrl 的白名单校验。
+                        // Bugfix: QR links are long and error-prone to retype by hand after
+                        // an app restart. Reuse the locally validated history entry here,
+                        // but opening still goes through onOpenUrl's allowlist check.
                         if (!onOpenUrl(link.url)) {
                             localError = invalidUrlMessage
                         }
@@ -725,7 +732,8 @@ private fun RemoteControlWebViewScreen(
 ) {
     val context = LocalContext.current
     var webView by remember { mutableStateOf<WebView?>(null) }
-    // 服务器条目只会在启动页增删；WebView 存续期间白名单不会变，进屏时读取一次即可。
+    // Server entries are only added/removed on the launcher screen; the allowlist cannot
+    // change while the WebView is alive, so reading once on entry is enough.
     val directServerOrigins = remember { DirectServerStore.savedOrigins(context) }
     var progress by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }

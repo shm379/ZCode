@@ -1,20 +1,28 @@
 # desktop-direct-server
 
-桌面 main 进程内的局域网直连服务器（Hono HTTP/WS + 完整 server services 图），让 Android 壳
-不经过云端 relay 直连桌面读取会话。规范：`docs/direct-server-desktop.md`。
+LAN direct server inside the desktop main process (Hono HTTP/WS + the full server
+services graph), letting the Android shell read desktop sessions directly without
+going through the cloud relay. Spec: `docs/direct-server-desktop.md`.
 
-不变量：
+Invariants:
 
-- `~/.zcode/v2/direct-server.json` 只由本模块读写；token 只生成一次（重启不轮换），
-  文件原子写入且权限 0600。
-- 服务器必须在 `onLocalDatabaseStartupReady` 之后启动（不与 Host 抢 tasks-index 首迁移），
-  必须在 `prepareAppQuit` 并行屏障内收口（HTTP close + services dispose）。
-- `/ws` 永远是 `web-remote-replayable`；token 必填（`?token=` / Bearer / HttpOnly cookie）。
-  静态 SPA 走 `ZCODE_WEB_STATIC_ROOT`，缺失时 `/` 404 并如实上报 `staticRootConfigured=false`。
-- 展示 URL 含 token：不进日志、不进 renderer 持久化；复制动作只在 UI 层发生。
+- `~/.zcode/v2/direct-server.json` is read/written only by this module; the token is
+  generated once (never rotated across restarts), and the file is written atomically
+  with 0600 permissions.
+- The server must start after `onLocalDatabaseStartupReady` (never racing the Host
+  for the first tasks-index migration) and must be torn down inside the
+  `prepareAppQuit` parallel barrier (HTTP close + services dispose).
+- `/ws` is always `web-remote-replayable`; the token is mandatory
+  (`?token=` / Bearer / HttpOnly cookie). The static SPA is served from
+  `ZCODE_WEB_STATIC_ROOT`; when missing, `/` returns 404 and
+  `staticRootConfigured=false` is reported honestly.
+- The display URL contains the token: never in logs, never persisted in the
+  renderer; copying happens only at the UI layer.
 
-与其它模块的交集：
+Intersections with other modules:
 
-- main/index.ts：只在本模块 contract 的三个方法上接线（启动门、IPC 依赖注入、退出屏障），
-  不直接触碰 services 图或 token 文件。
-- desktopWebRemoteControlIpc.ts：经依赖注入 `getDirectServerInfo` 暴露一次性 IPC。
+- main/index.ts: wires only the three contract methods (startup gate, IPC
+  dependency injection, quit barrier); it never touches the services graph or the
+  token file directly.
+- desktopWebRemoteControlIpc.ts: exposes the one-shot IPC through the injected
+  `getDirectServerInfo`.

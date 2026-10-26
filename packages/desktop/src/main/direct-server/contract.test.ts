@@ -7,7 +7,8 @@ import {
   pickListenPort,
 } from "./directServerManager.js";
 
-// 契约测试只 import contract 与 module，不知道实现是谁；同一份测试应同时跑真实现与跨进程代理。
+// Contract tests import only contract and module, knowing nothing about the implementation;
+// the same suite must run against both the real implementation and a cross-process proxy.
 describe("desktop-direct-server contract", () => {
   it("declares its module manifest", () => {
     expect(desktopDirectServerModule.id).toBe("desktop-direct-server");
@@ -87,7 +88,7 @@ describe("pickListenPort", () => {
 describe("buildDesktopServerId", () => {
   it("is stable and identity-safe", () => {
     expect(buildDesktopServerId("My-Mac.local")).toBe("desktop-my-mac.local");
-    expect(buildDesktopServerId("命中 主机!")).toBe("desktop-desktop");
+    expect(buildDesktopServerId("Ωé ü?")).toBe("desktop-desktop");
     expect(buildDesktopServerId("  ")).toBe("desktop-desktop");
   });
 });
