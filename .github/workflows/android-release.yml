@@ -1,14 +1,22 @@
 # Android release pipeline (fork-owned; see FORK.md).
 #
-# 触发：推送 mobile-v* 标签（例如 mobile-v1.0.0）时构建签名 APK/AAB 并发布 GitHub Release。
-# 签名：keystore 以 base64 存于 repo secret ZCODE_ANDROID_STORE_FILE_BASE64，
-#       口令存于 ZCODE_ANDROID_STORE_PASSWORD / ZCODE_ANDROID_KEY_PASSWORD，alias 固定为 zcode。
-#       keystore 本体与含口令的 properties 一律不入库（见 packages/android/.gitignore）。
+# Trigger: on pushing a mobile-v* tag (e.g. mobile-v1.0.0), build a signed APK/AAB
+# and publish a GitHub Release. workflow_dispatch builds only (no release step) so a
+# manual run from a branch can never mint a stray tag or publish artifacts outside
+# the mobile-v* line.
+# Signing: the keystore is stored base64-encoded in the repo secret
+#       ZCODE_ANDROID_STORE_FILE_BASE64; passwords live in
+#       ZCODE_ANDROID_STORE_PASSWORD / ZCODE_ANDROID_KEY_PASSWORD, alias in
+#       ZCODE_ANDROID_KEY_ALIAS (defaults to zcode when unset).
+#       The keystore itself and any properties file containing passwords never enter the
+#       repo (see packages/android/.gitignore).
 #
-# publish-nabux（可选、默认中性）：仅在 repo secret NABUX_APKHUB_TOKEN 存在时运行，
-#   调用 scripts/publish-apk-nabuxai.mjs --enqueue 在 apk.nabuxai.com 排队构建。
-#   注意：该站点无公开 API 文档，且需 hub 管理员先在服务端登记 app（见脚本头部说明）；
-#   未配置 secret 时本 job 直接跳过，不影响 release。
+# publish-nabux (optional, neutral by default): runs only when the repo secret
+#   NABUX_APKHUB_TOKEN exists; it calls scripts/publish-apk-nabuxai.mjs --enqueue to
+#   queue a build on apk.nabuxai.com.
+#   Note: that site has no public API docs, and a hub admin must first register the
+#   app server-side (see the script header); without the secret this job skips and
+#   the release is unaffected.
 
 name: android-release
 
@@ -43,7 +51,7 @@ jobs:
         env:
           NABUX_APKHUB_TOKEN: ${{ secrets.NABUX_APKHUB_TOKEN }}
         run: |
-          # 不回显 token 内容，只判断是否配置
+          # Never echo the token value; only check whether it is configured
           if [ -n "$NABUX_APKHUB_TOKEN" ]; then
             echo "nabux_enabled=true" >> "$GITHUB_OUTPUT"
           else
@@ -54,6 +62,7 @@ jobs:
         env:
           ZCODE_ANDROID_STORE_FILE_BASE64: ${{ secrets.ZCODE_ANDROID_STORE_FILE_BASE64 }}
           ZCODE_ANDROID_STORE_PASSWORD: ${{ secrets.ZCODE_ANDROID_STORE_PASSWORD }}
+          ZCODE_ANDROID_KEY_ALIAS: ${{ secrets.ZCODE_ANDROID_KEY_ALIAS || 'zcode' }}
           ZCODE_ANDROID_KEY_PASSWORD: ${{ secrets.ZCODE_ANDROID_KEY_PASSWORD }}
         run: |
           if [ -z "$ZCODE_ANDROID_STORE_FILE_BASE64" ]; then
@@ -62,11 +71,11 @@ jobs:
           fi
           KEYSTORE_PATH="$GITHUB_WORKSPACE/zcode-release.jks"
           printf '%s' "$ZCODE_ANDROID_STORE_FILE_BASE64" | base64 -d > "$KEYSTORE_PATH"
-          # gradle 读取 packages/android/keystore.properties（gitignored，此处由 CI 生成）
+          # gradle reads packages/android/keystore.properties (gitignored; generated here by CI)
           cat > packages/android/keystore.properties <<EOF
           ZCODE_ANDROID_STORE_FILE=$KEYSTORE_PATH
           ZCODE_ANDROID_STORE_PASSWORD=$ZCODE_ANDROID_STORE_PASSWORD
-          ZCODE_ANDROID_KEY_ALIAS=zcode
+          ZCODE_ANDROID_KEY_ALIAS=$ZCODE_ANDROID_KEY_ALIAS
           ZCODE_ANDROID_KEY_PASSWORD=$ZCODE_ANDROID_KEY_PASSWORD
           EOF
 
@@ -90,6 +99,7 @@ jobs:
           grep -qE "versionName='[0-9]+\.[0-9]+\.[0-9]+'" /tmp/badging.txt
 
       - name: Create or update GitHub Release with APK/AAB
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
@@ -103,11 +113,12 @@ jobs:
             gh release create "$TAG" "$APK" "$AAB" \
               --repo "$GITHUB_REPOSITORY" \
               --title "ZCode Mobile $TAG" \
-              --notes "Signed release build of tag $TAG. 安装与来源说明见 FORK.md / Release notes."
+              --notes "Signed release build of tag $TAG. See FORK.md / Release notes for install and provenance."
           fi
 
-  # 可选：把构建排队到 Nabu APK Hub（apk.nabuxai.com）。默认中性——
-  # 未配置 NABUX_APKHUB_TOKEN 时跳过；且需 hub 端已登记本仓库的 app（详见 scripts/publish-apk-nabuxai.mjs）。
+  # Optional: queue the build on Nabu APK Hub (apk.nabuxai.com). Neutral by default —
+  # skipped when NABUX_APKHUB_TOKEN is not configured; also requires the app for this
+  # repo to be registered on the hub side (see scripts/publish-apk-nabuxai.mjs for details).
   publish-nabux:
     runs-on: ubuntu-latest
     needs: build-release
