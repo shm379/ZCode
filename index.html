@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — ZCode Mobile (Android)</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.65;
+         max-width: 800px; margin: 0 auto; padding: 24px 20px 64px; color: #1c1e21; background: #fff; }
+  h1 { font-size: 1.7rem; margin-bottom: 4px; }
+  h2 { font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid #e4e6eb; padding-bottom: 6px; }
+  .meta { color: #65676b; font-size: 0.92rem; margin-bottom: 24px; }
+  ul { padding-left: 22px; }
+  li { margin: 6px 0; }
+  code { background: #f0f2f5; padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+  a { color: #2160bd; }
+</style>
+</head>
+<body>
+
+<h1>Privacy Policy</h1>
+<p class="meta"><strong>App:</strong> ZCode Mobile (Android) &middot; application ID <code>ai.zcode.mobile</code><br>
+<strong>Effective date:</strong> October 27, 2026 &middot; <strong>Version:</strong> 1.0</p>
+
+<p>This Privacy Policy describes how the ZCode Mobile Android application (the “App”) handles
+information. The App is an open-source remote-control client for the ZCode coding agent. It is
+designed to store your data on your own devices and to connect only to servers <em>you</em>
+choose. The App does not operate its own backend service and does not collect analytics.</p>
+
+<h2>1. Summary</h2>
+<ul>
+  <li>The App stores its settings (saved server addresses, access tokens, and a short list of
+      recently opened links) <strong>only on your device</strong>, in app-private storage.</li>
+  <li>The App has <strong>no analytics, no advertising, no trackers</strong>, and we never sell
+      or rent data.</li>
+  <li>Chat and task data you see in the App lives on the computer running ZCode (your desktop or
+      your own self-hosted server) — not on any server operated by us.</li>
+  <li>Camera frames used for QR scanning are processed <strong>on the device only</strong> and are
+      never stored or transmitted.</li>
+</ul>
+
+<h2>2. Information the App stores on your device</h2>
+<ul>
+  <li><strong>Saved direct-server entries:</strong> the address (origin) and, optionally, the
+      access token of self-hosted zcode-server instances you add, so you can reconnect quickly.</li>
+  <li><strong>Recent links:</strong> the last five remote-control links you opened (device name,
+      host, and time).</li>
+  <li><strong>Preferences:</strong> display and connection preferences needed for the App to work.</li>
+</ul>
+<p>All of the above are kept in the App's private storage on your device. Uninstalling the App
+permanently deletes all of it. The App does not sync this information anywhere.</p>
+
+<h2>3. Information processed when you connect</h2>
+<p>The App is a client. The data you view and send (chat messages, task data, files) is processed
+by the ZCode instance you connect to, not by us:</p>
+<ul>
+  <li><strong>Official relay connection (zcode.z.ai):</strong> if you connect by scanning the QR
+      code shown by the ZCode desktop app, your traffic is relayed by Z.ai's service and your
+      login is handled by Z.ai's sign-in page inside the App's web view. That data is handled
+      under <a href="https://zai.org/privacy">Z.ai's privacy policy</a>; we do not receive a copy.</li>
+  <li><strong>Direct / self-hosted connection:</strong> if you add your own zcode-server address,
+      the App talks directly to that server over your network. You choose the operator of that
+      server (in most cases, yourself). Transport is plain HTTP unless you configure HTTPS;
+      the App's security boundary for this path is the server address you saved plus its access
+      token.</li>
+</ul>
+
+<h2>4. Permissions</h2>
+<ul>
+  <li><strong>Camera</strong> — used only to scan QR codes. Frames are analyzed on the device by
+      the on-device ML Kit Barcode Scanning library and are never stored, uploaded, or shared.</li>
+  <li><strong>Internet / network state</strong> — required to reach the server you connect to.</li>
+  <li><strong>Notifications &amp; foreground service</strong> — an ongoing notification keeps the
+      remote session alive while you use your phone. It carries no message content.</li>
+</ul>
+
+<h2>5. Information we share</h2>
+<p>We do not share information with third parties. There are no advertising networks, analytics
+providers, or data brokers in the App. The only parties that process your data are the ones you
+yourself connect to: your relay provider (Z.ai) and the operator of the server you add
+(usually you).</p>
+
+<h2>6. Children</h2>
+<p>The App is a developer tool, is not directed at children under 13 (or the equivalent minimum
+age in your jurisdiction), and we do not knowingly collect personal information from children.</p>
+
+<h2>7. Security</h2>
+<p>Saved tokens are stored in the App's private storage on your device. Connections to the
+official relay use HTTPS. Connections to self-hosted servers use the scheme you configure
+(HTTP or HTTPS). No data is transmitted to any server operated by the App's publisher.</p>
+
+<h2>8. Your controls</h2>
+<ul>
+  <li>Delete saved servers, recent links, and tokens from inside the App (Delete / Clear), or by
+      uninstalling the App.</li>
+  <li>Revoke camera or notification permissions at any time in Android Settings; QR scanning
+      simply stops working without them.</li>
+  <li>Chat/task data deletion is controlled where that data lives: your desktop/self-hosted
+      server, or your Z.ai account for the relay path.</li>
+</ul>
+
+<h2>9. Changes to this policy</h2>
+<p>We may update this policy when the App changes. The effective date above shows the current
+version; material changes will be reflected in the App's repository release notes.</p>
+
+<h2>10. Contact</h2>
+<p>This App is published as an open-source project. If you have questions about this policy,
+open an issue at
+<a href="https://github.com/shm379/ZCode/issues">github.com/shm379/ZCode/issues</a>.</p>
+
+</body>
+</html>
