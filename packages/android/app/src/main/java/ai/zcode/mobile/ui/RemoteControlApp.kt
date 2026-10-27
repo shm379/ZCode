@@ -60,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -87,6 +88,9 @@ import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+
+/** Public privacy policy shown on the Play listing and from the launcher (GitHub Pages). */
+private const val PRIVACY_POLICY_URL = "https://shm379.github.io/ZCode/"
 
 @Composable
 fun RemoteControlApp(
@@ -484,6 +488,7 @@ private fun RemoteControlLauncher(
     onDeleteDirectServer: (id: String) -> Unit,
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     var input by rememberSaveable { mutableStateOf("") }
     var localError by rememberSaveable { mutableStateOf<String?>(null) }
     val invalidUrlMessage = stringResource(R.string.remote_url_invalid)
@@ -553,6 +558,15 @@ private fun RemoteControlLauncher(
             onConnect = onConnectDirectServer,
             onDelete = onDeleteDirectServer,
         )
+        // Play Store requires the privacy policy to be reachable from inside the app;
+        // open it in the system browser so it stays a standard, non-editable web page.
+        Spacer(modifier = Modifier.height(16.dp))
+        TextButton(
+            onClick = { runCatching { uriHandler.openUri(PRIVACY_POLICY_URL) } },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.remote_privacy_policy))
+        }
         if (recentLinks.isNotEmpty()) {
             Spacer(modifier = Modifier.height(20.dp))
             Row(

@@ -14,6 +14,7 @@
     <string name="remote_scan_camera_failed">Could not start the camera.</string>
     <string name="remote_recent_title">Recent links</string>
     <string name="remote_recent_clear">Clear</string>
+    <string name="remote_privacy_policy">Privacy policy</string>
     <string name="remote_direct_title">Direct server</string>
     <string name="remote_direct_description">Connect to your own zcode-server over the network (host or host:port).</string>
     <string name="remote_direct_address_label">Server address</string>

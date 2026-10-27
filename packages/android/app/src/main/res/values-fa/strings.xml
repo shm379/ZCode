@@ -29,6 +29,7 @@
     <string name="remote_direct_connect_failed">اتصال به سرور ذخیره‌شده ممکن نشد.</string>
     <string name="remote_recent_title">لینک‌های اخیر</string>
     <string name="remote_recent_clear">پاک کردن</string>
+    <string name="remote_privacy_policy">سیاست حفظ حریم خصوصی</string>
     <string name="remote_screen_title">کنترل از راه دور</string>
     <string name="remote_reload_button">بارگذاری مجدد</string>
     <string name="remote_close_button">بستن</string>

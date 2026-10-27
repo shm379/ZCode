@@ -15,6 +15,7 @@
     <string name="remote_scan_camera_failed">无法启动相机。</string>
     <string name="remote_recent_title">最近打开</string>
     <string name="remote_recent_clear">清空</string>
+    <string name="remote_privacy_policy">隐私政策</string>
     <string name="remote_direct_title">直连服务器</string>
     <string name="remote_direct_description">直连自托管的 zcode-server（host 或 host:port）。</string>
     <string name="remote_direct_address_label">服务器地址</string>
