@@ -90,7 +90,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Public privacy policy shown on the Play listing and from the launcher (GitHub Pages). */
-private const val PRIVACY_POLICY_URL = "https://shm379.github.io/ZCode/"
+private const val PRIVACY_POLICY_URL = "https://shm379.github.io/ZCode/privacy.html"
 
 @Composable
 fun RemoteControlApp(
