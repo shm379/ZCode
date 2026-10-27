@@ -23,6 +23,7 @@ These paths are owned by the fork; on sync conflicts the fork version wins:
 - the `<!-- FORK:BEGIN -->` … `<!-- FORK:END -->` block in `README.md` and `README.en.md`
 - `.github/workflows/android-release.yml`
 - `scripts/sync-upstream.mjs`
+- `play/` (Google Play metadata: `play/metadata`, `play/screenshots`, `play/changelogs`; published with `gplay`)
 - the `.v2c/`, `.video_agent/`, `.zcode/` lines in the root `.gitignore`
 
 ### Syncing with upstream
@@ -56,7 +57,13 @@ Finish with `git commit` (completes the merge) or back out with `git merge --abo
    | `ZCODE_ANDROID_KEY_ALIAS` | key alias (default `zcode`) |
    | `ZCODE_ANDROID_KEY_PASSWORD` | key password |
 
-2. The signing workflow lives at `.github/workflows/android-release.yml` and runs on pushes of tags matching `mobile-v*`. Keep the tag version in step with `versionName` in `packages/android/app/build.gradle.kts` (first release: `mobile-v1.0.0`).
+2. Publish to Google Play with `gplay` (service account at `~/.gplay/play-console-cli.json`, gitignored outside the repo):
+   ```bash
+   gplay release --package ai.zcode.mobile --track internal --bundle app-release.aab \
+     --listings-dir play/metadata --screenshots-dir play/screenshots --release-notes @/tmp/release-notes.json
+   ```
+   Keep `play/metadata/en-US/changelogs/<versionCode>.txt` (moved to `play/changelogs/`) and the listing text in sync with each release.
+3. The signing workflow lives at `.github/workflows/android-release.yml` and runs on pushes of tags matching `mobile-v*`. Keep the tag version in step with `versionName` in `packages/android/app/build.gradle.kts` (first release: `mobile-v1.0.0`).
 3. The published `applicationId` is `ai.zcode.mobile`; changing it after the first public release breaks updates for existing installs.
 4. The workflow attaches the signed APK to the tag's release; the final distribution goes to [apk.nabuxai.com](https://apk.nabuxai.com) (Nabu APK Hub).
 

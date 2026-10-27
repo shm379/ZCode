@@ -1,0 +1,5 @@
+First public release (v1.0.1).
+• In-app privacy policy link (English/Chinese/Persian)
+• Direct connection to a self-hosted zcode-server over LAN (address + token)
+• QR scanning for both relay and direct-server links
+• Foreground keep-alive service for stable remote sessions

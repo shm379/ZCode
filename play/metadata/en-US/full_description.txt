@@ -1,0 +1,14 @@
+ZCode Mobile is the companion app for ZCode, the open-source AI coding agent. Control the agent running on your own computer directly from your phone.
+
+• Read every chat and task — browse sessions running on your desktop or your self-hosted zcode-server, wherever you are.
+• Two ways to connect: scan the desktop QR code through the official relay, or connect directly to your own server on your local network — no cloud account needed on the direct path.
+• Send instructions, follow streaming output, approve permission requests and keep long-running tasks moving while you are away from your desk.
+• A foreground keep-alive service keeps the session reachable, and reconnects pick up right where you left off.
+
+Your data stays yours: the app stores its settings only on your device, ships with no analytics or trackers, and talks only to the servers you choose.
+
+Open source (Apache-2.0) — an enhanced fork of ZCode:
+https://github.com/shm379/ZCode
+
+Privacy policy:
+https://shm379.github.io/ZCode/privacy.html
